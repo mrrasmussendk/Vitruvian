@@ -4,6 +4,7 @@ using UtilityAi.Compass.Abstractions.Facts;
 using UtilityAi.Compass.Abstractions.Interfaces;
 using UtilityAi.Compass.Runtime;
 using UtilityAi.Compass.Runtime.Routing;
+using UtilityAi.Compass.StandardModules;
 
 namespace UtilityAi.Compass.Cli;
 
@@ -33,6 +34,35 @@ internal sealed class RequestProcessor
 
         // Register with router (metadata is optional and defaults to 0.0 cost/risk)
         _router.RegisterModule(module, metadata: null);
+    }
+
+    /// <summary>
+    /// Gets a context-aware version of a module that wraps its model client with conversation history.
+    /// </summary>
+    private ICompassModule GetContextAwareModule(string domain)
+    {
+        if (!_modules.TryGetValue(domain, out var module))
+            return null!;
+
+        // If we don't have a model client, just return the original module
+        if (_modelClient is null)
+            return module;
+
+        // Wrap the model client with context
+        var contextAwareClient = new ContextAwareModelClient(_modelClient, _conversationHistory);
+
+        // Create a new instance of the module with the context-aware client
+        // This is a bit hacky but works without changing all modules
+        return module switch
+        {
+            ConversationModule _ => new ConversationModule(contextAwareClient),
+            WebSearchModule _ => new WebSearchModule(contextAwareClient),
+            SummarizationModule _ => new SummarizationModule(contextAwareClient),
+            GmailModule _ => new GmailModule(contextAwareClient),
+            FileOperationsModule fileModule => new FileOperationsModule(contextAwareClient,
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "compass-workspace")),
+            _ => module // Return original if we don't know how to wrap it
+        };
     }
 
     public async Task<string> ProcessAsync(string input, CancellationToken cancellationToken)
@@ -96,17 +126,19 @@ internal sealed class RequestProcessor
             return fallbackResponse;
         }
 
-        // Execute the selected module with enriched input that includes context
+        // Execute the selected module with CLEAN input
+        // Context is automatically provided via the context-aware model client wrapper
         var execStart = sw.ElapsedMilliseconds;
         try
         {
-            var response = await module.ExecuteAsync(enrichedInput, userId, cancellationToken);
+            var contextAwareModule = GetContextAwareModule(selectedDomain);
+            var response = await contextAwareModule.ExecuteAsync(input, userId, cancellationToken);
             Console.WriteLine($"[PERF]   Module.Execute ({selectedDomain}): {sw.ElapsedMilliseconds - execStart}ms");
             return response;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ERROR] Module {selectedDomain} failed: {ex.Message}");
+            Console.WriteLine($"[ROUTER] Module {selectedDomain} failed: {ex.Message}");
             return $"Error executing {selectedDomain}: {ex.Message}";
         }
     }
