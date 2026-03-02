@@ -52,12 +52,20 @@ public sealed class FileCreationWorkflow : IWorkflowModule
             act: _ =>
             {
                 var (path, content) = FileCreationModule.ParseFileRequest(request.Text);
-                var directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory);
-                File.WriteAllText(path, content);
-                rt.Bus.Publish(new AiResponse($"File created: {path}"));
-                rt.Bus.Publish(new StepResult(StepOutcome.Succeeded, $"File created: {path}"));
+                try
+                {
+                    var directory = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(directory))
+                        Directory.CreateDirectory(directory);
+                    File.WriteAllText(path, content);
+                    rt.Bus.Publish(new AiResponse($"File created: {path}"));
+                    rt.Bus.Publish(new StepResult(StepOutcome.Succeeded, $"File created: {path}"));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+                {
+                    rt.Bus.Publish(new AiResponse($"Failed to create file: {path} ({ex.Message})"));
+                    rt.Bus.Publish(new StepResult(StepOutcome.FailedRetryable, $"Failed to create file: {path}"));
+                }
                 return Task.CompletedTask;
             })
         { Description = "Create a file with the specified content" };

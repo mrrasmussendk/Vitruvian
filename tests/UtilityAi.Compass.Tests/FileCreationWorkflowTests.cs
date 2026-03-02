@@ -86,6 +86,38 @@ public class FileCreationWorkflowTests
     }
 
     [Fact]
+    public async Task ProposeStart_ActPublishesFailedRetryable_WhenPathIsDirectory()
+    {
+        var wf = new FileCreationWorkflow();
+        var bus = new EventBus();
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            bus.Publish(new UserRequest($"create file {tempDir} with content hello world"));
+            var rt = new UtilityAi.Utils.Runtime(bus, 0);
+
+            var proposals = wf.ProposeStart(rt).ToList();
+            Assert.Single(proposals);
+
+            await proposals[0].Act(CancellationToken.None);
+
+            var response = bus.GetOrDefault<AiResponse>();
+            Assert.NotNull(response);
+            Assert.Contains("Failed to create file", response.Text);
+
+            var stepResult = bus.GetOrDefault<StepResult>();
+            Assert.NotNull(stepResult);
+            Assert.Equal(StepOutcome.FailedRetryable, stepResult.Outcome);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public void ProposeSteps_ReturnsVerifyProposal_WhenOnVerifyStep()
     {
         var wf = new FileCreationWorkflow();

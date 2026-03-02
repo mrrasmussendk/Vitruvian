@@ -33,11 +33,18 @@ public sealed class FileCreationModule : ICapabilityModule
             act: _ =>
             {
                 var (path, content) = ParseFileRequest(request.Text);
-                var directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory);
-                File.WriteAllText(path, content);
-                rt.Bus.Publish(new AiResponse($"File created: {path}"));
+                try
+                {
+                    var directory = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(directory))
+                        Directory.CreateDirectory(directory);
+                    File.WriteAllText(path, content);
+                    rt.Bus.Publish(new AiResponse($"File created: {path}"));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+                {
+                    rt.Bus.Publish(new AiResponse($"Failed to create file: {path} ({ex.Message})"));
+                }
                 return Task.CompletedTask;
             }
         ) { Description = "Create a file with the specified content" };
