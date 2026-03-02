@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UtilityAi.Compass.Abstractions\UtilityAi.Compass.Abstractions.csproj" />
+    <ProjectReference Include="..\UtilityAi.Compass.PluginSdk\UtilityAi.Compass.PluginSdk.csproj" />
   </ItemGroup>
 
   <ItemGroup>

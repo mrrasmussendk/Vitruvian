@@ -166,3 +166,32 @@ public enum ValidationOutcomeTag
     /// <summary>Validation failed fatally.</summary>
     FailFatal
 }
+
+/// <summary>Linux-style file/resource access permissions for modules.</summary>
+[Flags]
+public enum ModuleAccess
+{
+    /// <summary>No access.</summary>
+    None = 0,
+    /// <summary>Permission to read files or resources.</summary>
+    Read = 1,
+    /// <summary>Permission to write or modify files or resources.</summary>
+    Write = 2,
+    /// <summary>Permission to execute commands or processes.</summary>
+    Execute = 4
+}
+
+/// <summary>Classifies the type of operation a module performs, used for HITL gating.</summary>
+public enum OperationType
+{
+    /// <summary>A read-only query that does not modify state.</summary>
+    Read,
+    /// <summary>Creates or updates state.</summary>
+    Write,
+    /// <summary>Permanently removes or irreversibly alters state.</summary>
+    Delete,
+    /// <summary>Performs network communication.</summary>
+    Network,
+    /// <summary>Executes a command or process.</summary>
+    Execute
+}

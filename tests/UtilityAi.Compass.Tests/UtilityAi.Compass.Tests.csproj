@@ -21,6 +21,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\UtilityAi.Compass.Abstractions\UtilityAi.Compass.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\UtilityAi.Compass.Cli\UtilityAi.Compass.Cli.csproj" />
+    <ProjectReference Include="..\..\src\UtilityAi.Compass.Hitl\UtilityAi.Compass.Hitl.csproj" />
+    <ProjectReference Include="..\..\src\UtilityAi.Compass.PluginHost\UtilityAi.Compass.PluginHost.csproj" />
+    <ProjectReference Include="..\..\src\UtilityAi.Compass.PluginSdk\UtilityAi.Compass.PluginSdk.csproj" />
     <ProjectReference Include="..\..\src\UtilityAi.Compass.Runtime\UtilityAi.Compass.Runtime.csproj" />
     <ProjectReference Include="..\..\src\UtilityAi.Compass.StandardModules\UtilityAi.Compass.StandardModules.csproj" />
   </ItemGroup>
