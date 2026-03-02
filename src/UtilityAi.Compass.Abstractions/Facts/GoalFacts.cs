@@ -29,3 +29,13 @@ public sealed record AiResponse(string Text, string? CorrelationId = null);
 /// <param name="EstimatedSteps">Estimated number of actions needed to fulfill the request.</param>
 /// <param name="IsCompound">Whether the request contains multiple distinct intents.</param>
 public sealed record MultiStepRequest(string OriginalRequest, int EstimatedSteps, bool IsCompound);
+
+/// <summary>Fact indicating the goal has been completed and orchestration should stop.</summary>
+/// <param name="Confidence">Confidence that the goal is satisfied (0-1).</param>
+/// <param name="Reason">Explanation for why the goal is considered complete.</param>
+public sealed record GoalCompleted(double Confidence, string Reason);
+
+/// <summary>Fact published by module router with LLM-selected relevant modules for the current request.</summary>
+/// <param name="ModuleDomains">List of module domain IDs that are relevant to fulfilling this request.</param>
+/// <param name="Confidence">Confidence score in the routing decision [0, 1].</param>
+public sealed record RelevantModules(IReadOnlyList<string> ModuleDomains, double Confidence);

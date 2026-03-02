@@ -111,6 +111,17 @@ file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpCl
         return response.Text;
     }
 
+    public async Task<string> CompleteAsync(string systemMessage, string userMessage, IReadOnlyList<ModelTool>? tools = null, CancellationToken cancellationToken = default)
+    {
+        var response = await GenerateAsync(new ModelRequest
+        {
+            Prompt = userMessage,
+            SystemMessage = systemMessage,
+            Tools = tools
+        }, cancellationToken);
+        return response.Text;
+    }
+
     public async Task<ModelResponse> GenerateAsync(ModelRequest modelRequest, CancellationToken cancellationToken)
     {
         try
@@ -126,6 +137,11 @@ file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpCl
 
             if (!string.IsNullOrWhiteSpace(modelRequest.SystemMessage))
                 body["instructions"] = modelRequest.SystemMessage;
+
+            // For reasoning models (GPT-5, o3), use low effort for faster responses
+            var modelName = (modelRequest.ModelHint ?? config.Model).ToLowerInvariant();
+            if (modelName.Contains("gpt-5") || modelName.Contains("o3") || modelName.Contains("o1"))
+                body["reasoning"] = new Dictionary<string, object> { ["effort"] = "low" };
 
             request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
@@ -190,6 +206,17 @@ file sealed class AnthropicModelClient(ModelConfiguration config, HttpClient htt
         return response.Text;
     }
 
+    public async Task<string> CompleteAsync(string systemMessage, string userMessage, IReadOnlyList<ModelTool>? tools = null, CancellationToken cancellationToken = default)
+    {
+        var response = await GenerateAsync(new ModelRequest
+        {
+            Prompt = userMessage,
+            SystemMessage = systemMessage,
+            Tools = tools
+        }, cancellationToken);
+        return response.Text;
+    }
+
     public async Task<ModelResponse> GenerateAsync(ModelRequest modelRequest, CancellationToken cancellationToken)
     {
         try
@@ -251,6 +278,17 @@ file sealed class GeminiModelClient(ModelConfiguration config, HttpClient httpCl
     public async Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken)
     {
         var response = await GenerateAsync(new ModelRequest { Prompt = prompt }, cancellationToken);
+        return response.Text;
+    }
+
+    public async Task<string> CompleteAsync(string systemMessage, string userMessage, IReadOnlyList<ModelTool>? tools = null, CancellationToken cancellationToken = default)
+    {
+        var response = await GenerateAsync(new ModelRequest
+        {
+            Prompt = userMessage,
+            SystemMessage = systemMessage,
+            Tools = tools
+        }, cancellationToken);
         return response.Text;
     }
 

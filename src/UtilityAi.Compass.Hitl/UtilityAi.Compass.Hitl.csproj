@@ -3,11 +3,10 @@
   <ItemGroup>
     <ProjectReference Include="..\UtilityAi.Compass.Abstractions\UtilityAi.Compass.Abstractions.csproj" />
     <ProjectReference Include="..\UtilityAi.Compass.Runtime\UtilityAi.Compass.Runtime.csproj" />
-    <PackageReference Include="UtilityAi" Version="1.6.5" />
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

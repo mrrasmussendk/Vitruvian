@@ -8,6 +8,12 @@ namespace UtilityAi.Compass.Runtime.DI;
 public sealed class CompassOptions
 {
     /// <summary>
+    /// Gets or sets the working directory for file operations.
+    /// When not set, uses the current directory. Relative file paths in file operations are resolved relative to this directory.
+    /// </summary>
+    public string? WorkingDirectory { get; set; }
+
+    /// <summary>
     /// Gets or sets the SQLite connection string used for durable memory.
     /// When not set, Compass uses a local <c>appdb/compass-memory.db</c> file under the app base directory.
     /// </summary>

@@ -46,4 +46,14 @@ public interface IModelClient
 
     /// <summary>Rich request supporting model hints, tools, temperature, etc.</summary>
     Task<ModelResponse> GenerateAsync(ModelRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Simplified completion method with system/user messages and optional tools.
+    /// Returns just the text response.
+    /// </summary>
+    Task<string> CompleteAsync(
+        string systemMessage,
+        string userMessage,
+        IReadOnlyList<ModelTool>? tools = null,
+        CancellationToken cancellationToken = default);
 }

@@ -115,7 +115,7 @@ public static class CompoundRequestOrchestrator
         string input,
         CancellationToken cancellationToken)
     {
-        if (modelClient is null)
+        if (modelClient is null || !IsCompoundRequest(input))
             return Task.FromResult(new List<string> { input });
 
         return DecomposeRequestAsync(modelClient, input, cancellationToken);

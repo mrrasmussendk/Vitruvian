@@ -1,107 +1,161 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using UtilityAi.Capabilities;
-using UtilityAi.Compass.Abstractions;
 using UtilityAi.Compass.Abstractions.Facts;
 using UtilityAi.Compass.Abstractions.Interfaces;
 using UtilityAi.Compass.Runtime;
-using UtilityAi.Compass.Runtime.Strategy;
-using UtilityAi.Memory;
-using UtilityAi.Orchestration;
-using UtilityAi.Sensor;
-using UtilityAi.Utils;
+using UtilityAi.Compass.Runtime.Routing;
 
 namespace UtilityAi.Compass.Cli;
 
-internal sealed class RequestProcessor(IHost host, CompassGovernedSelectionStrategy strategy, IModelClient? modelClient)
+/// <summary>
+/// Simplified request processor using direct LLM-based module routing instead of UtilityAI orchestration.
+/// </summary>
+internal sealed class RequestProcessor
 {
-    private const int MaxConversationTurns = 50;
-    private static readonly TimeSpan ConversationRetentionWindow = TimeSpan.FromHours(1);
+    private readonly IHost _host;
+    private readonly ModuleRouter _router;
+    private readonly IModelClient? _modelClient;
+    private readonly Dictionary<string, ICompassModule> _modules = new();
+    private readonly List<(string User, string Assistant)> _conversationHistory = new();
 
-    public async Task<(GoalSelected? Goal, LaneSelected? Lane, string Response)> ProcessAsync(string input, CancellationToken cancellationToken)
+    private const int MaxConversationTurns = 10;
+
+    public RequestProcessor(IHost host, ModuleRouter router, IModelClient? modelClient)
     {
-        GoalSelected? goal = null;
-        LaneSelected? lane = null;
-        string responseText;
+        _host = host;
+        _router = router;
+        _modelClient = modelClient;
+    }
 
-        var requests = await CompoundRequestOrchestrator.PlanRequestsAsync(modelClient, input, cancellationToken);
+    public void RegisterModule(ICompassModule module)
+    {
+        _modules[module.Domain] = module;
+
+        // Register with router (metadata is optional and defaults to 0.0 cost/risk)
+        _router.RegisterModule(module, metadata: null);
+    }
+
+    public async Task<string> ProcessAsync(string input, CancellationToken cancellationToken)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Check if this is a compound request
+        var planStart = sw.ElapsedMilliseconds;
+        var requests = await CompoundRequestOrchestrator.PlanRequestsAsync(_modelClient, input, cancellationToken);
+        Console.WriteLine($"[PERF] PlanRequests: {sw.ElapsedMilliseconds - planStart}ms");
+
+        string responseText;
         if (requests.Count > 1)
         {
             var allResponses = new List<string>();
             foreach (var request in requests)
             {
-                var (g, l, response) = await RunSingleRequestAsync(request, cancellationToken);
+                var response = await ExecuteSingleRequestAsync(request, null, cancellationToken);
                 allResponses.Add(response);
-                goal ??= g;
-                lane ??= l;
             }
-
             responseText = string.Join("\n\n", allResponses);
         }
         else
         {
-            (goal, lane, responseText) = await RunSingleRequestAsync(input, cancellationToken);
+            var execStart = sw.ElapsedMilliseconds;
+            responseText = await ExecuteSingleRequestAsync(input, null, cancellationToken);
+            Console.WriteLine($"[PERF] ExecuteSingleRequest: {sw.ElapsedMilliseconds - execStart}ms");
         }
 
+        var storeStart = sw.ElapsedMilliseconds;
         await StoreConversationTurnAsync(input, responseText, cancellationToken);
-        return (goal, lane, responseText);
+        Console.WriteLine($"[PERF] StoreConversation: {sw.ElapsedMilliseconds - storeStart}ms");
+        Console.WriteLine($"[PERF] Total: {sw.ElapsedMilliseconds}ms");
+
+        return responseText;
     }
 
-    private async Task<(GoalSelected? Goal, LaneSelected? Lane, string Response)> RunSingleRequestAsync(string input, CancellationToken cancellationToken)
+    private async Task<string> ExecuteSingleRequestAsync(string input, string? userId, CancellationToken cancellationToken)
     {
-        var bus = new EventBus();
-        bus.Publish(new UserRequest(input));
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        var requestOrchestrator = new UtilityAiOrchestrator(selector: strategy, stopAtZero: true, bus: bus);
+        // Build enriched input with conversation context for routing
+        var enrichedInput = BuildEnrichedInput(input);
 
-        foreach (var sensor in host.Services.GetServices<ISensor>())
-            requestOrchestrator.AddSensor(sensor);
+        // Route to the best module
+        var routeStart = sw.ElapsedMilliseconds;
+        var selectedDomain = await _router.SelectModuleAsync(enrichedInput, cancellationToken);
+        Console.WriteLine($"[PERF]   Router.SelectModule: {sw.ElapsedMilliseconds - routeStart}ms (selected: {selectedDomain ?? "none"})");
 
-        foreach (var module in host.Services.GetServices<ICapabilityModule>())
-            requestOrchestrator.AddModule(module);
-
-        await requestOrchestrator.RunAsync(maxTicks: 10, cancellationToken);
-
-        var goal = bus.GetOrDefault<GoalSelected>();
-        var lane = bus.GetOrDefault<LaneSelected>();
-        var response = bus.GetOrDefault<AiResponse>();
-
-        if (response is not null)
-            return (goal, lane, response.Text);
-
-        if (modelClient is null)
+        if (selectedDomain is null || !_modules.TryGetValue(selectedDomain, out var module))
         {
-            return (goal, lane,
-                "No model configured. Run 'compass --setup' or scripts/install.sh (Linux/macOS) / scripts/install.ps1 (Windows).");
-        }
-
-        if (goal?.Goal == GoalTag.Execute || lane?.Lane == Lane.Execute)
-        {
-            return (goal, lane,
-                "I can't complete this action transactionally because no installed capability can execute and revert it. Install a module that supports this action.");
-        }
-
-        var responseText = await modelClient.GenerateAsync(input, cancellationToken);
-        return (goal, lane, responseText);
-    }
-
-    private async Task StoreConversationTurnAsync(string input, string responseText, CancellationToken cancellationToken)
-    {
-        var memoryStore = host.Services.GetService<IMemoryStore>();
-        if (memoryStore is null || string.IsNullOrWhiteSpace(responseText))
-            return;
-
-        await memoryStore.StoreAsync(
-            new ConversationTurn
+            if (_modelClient is null)
             {
-                UserMessage = input,
-                AssistantResponse = responseText
-            },
-            DateTimeOffset.UtcNow,
-            cancellationToken);
+                return "No model configured. Run 'compass --setup' or scripts/install.sh (Linux/macOS) / scripts/install.ps1 (Windows).";
+            }
 
-        var count = await memoryStore.CountAsync<ConversationTurn>(cancellationToken);
-        if (count > MaxConversationTurns)
-            await memoryStore.PruneAsync(ConversationRetentionWindow, cancellationToken);
+            // Fallback to direct LLM response
+            var llmStart = sw.ElapsedMilliseconds;
+            var fallbackResponse = await _modelClient.GenerateAsync(input, cancellationToken);
+            Console.WriteLine($"[PERF]   Fallback LLM: {sw.ElapsedMilliseconds - llmStart}ms");
+            return fallbackResponse;
+        }
+
+        // Execute the selected module with enriched input that includes context
+        var execStart = sw.ElapsedMilliseconds;
+        try
+        {
+            var response = await module.ExecuteAsync(enrichedInput, userId, cancellationToken);
+            Console.WriteLine($"[PERF]   Module.Execute ({selectedDomain}): {sw.ElapsedMilliseconds - execStart}ms");
+            return response;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Module {selectedDomain} failed: {ex.Message}");
+            return $"Error executing {selectedDomain}: {ex.Message}";
+        }
+    }
+
+    private Task StoreConversationTurnAsync(string input, string responseText, CancellationToken cancellationToken)
+    {
+        // Store in-memory conversation history
+        _conversationHistory.Add((input, responseText));
+
+        // Keep only recent turns
+        while (_conversationHistory.Count > MaxConversationTurns)
+        {
+            _conversationHistory.RemoveAt(0);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private string BuildEnrichedInput(string input)
+    {
+        // If there's recent conversation history, provide context to improve routing and execution
+        if (_conversationHistory.Count == 0)
+            return input;
+
+        // Get the most recent exchange(s) - up to 2 turns for better context
+        var recentTurns = _conversationHistory.TakeLast(Math.Min(2, _conversationHistory.Count)).ToList();
+
+        if (recentTurns.Count == 0)
+            return input;
+
+        var contextBuilder = new System.Text.StringBuilder();
+        contextBuilder.AppendLine("[Recent conversation context:");
+
+        foreach (var (user, assistant) in recentTurns)
+        {
+            contextBuilder.AppendLine($"  User: {TruncateForContext(user, 100)}");
+            contextBuilder.AppendLine($"  Assistant: {TruncateForContext(assistant, 150)}");
+        }
+
+        contextBuilder.AppendLine($"]\n\nCurrent user message: {input}");
+
+        return contextBuilder.ToString();
+    }
+
+    private static string TruncateForContext(string text, int maxLength = 200)
+    {
+        if (text.Length <= maxLength)
+            return text;
+
+        return text.Substring(0, maxLength) + "...";
     }
 }

@@ -1,24 +1,12 @@
-using UtilityAi.Capabilities;
-using UtilityAi.Consideration;
-using UtilityAi.Consideration.General;
-using UtilityAi.Compass.Abstractions;
-using UtilityAi.Compass.Abstractions.Facts;
 using UtilityAi.Compass.Abstractions.Interfaces;
-using UtilityAi.Compass.PluginSdk.Attributes;
-using UtilityAi.Utils;
 
 namespace UtilityAi.Compass.StandardModules;
 
 /// <summary>
-/// Standard module for Gmail-related tasks with read and draft-write support.
+/// Gmail module implementing ICompassModule.
+/// Reads Gmail messages and creates draft replies (does not send directly).
 /// </summary>
-[CompassCapability("gmail", priority: 3)]
-[CompassGoals(GoalTag.Answer, GoalTag.Execute)]
-[CompassLane(Lane.Execute)]
-[CompassCost(0.5)]
-[CompassRisk(0.3)]
-[CompassSideEffects(SideEffectLevel.Write)]
-public sealed class GmailModule : ICapabilityModule
+public sealed class GmailModule : ICompassModule
 {
     private readonly IModelClient? _modelClient;
 
@@ -38,40 +26,31 @@ public sealed class GmailModule : ICapabilityModule
         "https://www.googleapis.com/auth/gmail.compose"
     ];
 
+    public string Domain => "gmail";
+    public string Description => "Read and send Gmail emails";
+
     public GmailModule(IModelClient? modelClient = null)
     {
         _modelClient = modelClient;
     }
 
-    public IEnumerable<Proposal> Propose(Runtime rt)
+    public async Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
     {
-        if (_modelClient is null) yield break;
-        var request = rt.Bus.GetOrDefault<UserRequest>();
-        if (request is null || !IsGmailRequest(request.Text))
-            yield break;
+        if (_modelClient is null)
+            return "No model configured. Run 'compass --setup' or scripts/install.sh (Linux/macOS) / scripts/install.ps1 (Windows).";
 
-        yield return new Proposal(
-            id: "gmail.read-draft",
-            cons: [new ConstantValue(0.75)],
-            act: async ct =>
-            {
-                var response = await _modelClient.GenerateAsync(
-                    new ModelRequest
-                    {
-                        Prompt = request.Text,
-                        SystemMessage = "You are a Gmail assistant. You may read Gmail messages and create draft replies only. Never send messages directly.",
-                        MaxTokens = 512,
-                        Tools = [GmailReadTool, GmailDraftTool]
-                    },
-                    ct);
-                rt.Bus.Publish(new AiResponse(response.Text));
-            })
-        { Description = "Read Gmail messages and optionally draft a reply" };
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        var systemMessage = "You are a Gmail assistant. You may read Gmail messages and create draft replies only. Never send messages directly.";
+
+        var response = await _modelClient.CompleteAsync(
+            systemMessage: systemMessage,
+            userMessage: request,
+            tools: [GmailReadTool, GmailDraftTool],
+            cancellationToken: ct);
+
+        Console.WriteLine($"[PERF]   SimpleGmail LLM call: {sw.ElapsedMilliseconds}ms");
+
+        return response;
     }
-
-    private static bool IsGmailRequest(string text)
-        => text.Contains("gmail", StringComparison.OrdinalIgnoreCase)
-           || text.Contains("email inbox", StringComparison.OrdinalIgnoreCase)
-           || text.Contains("email draft", StringComparison.OrdinalIgnoreCase)
-           || text.Contains("email reply", StringComparison.OrdinalIgnoreCase);
 }

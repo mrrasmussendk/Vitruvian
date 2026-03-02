@@ -3,25 +3,19 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using UtilityAi.Compass.Cli;
-using UtilityAi.Capabilities;
 using UtilityAi.Compass.Runtime;
-using UtilityAi.Compass.Runtime.Memory;
+using UtilityAi.Compass.Runtime.Routing;
 using UtilityAi.Compass.Abstractions.Facts;
 using UtilityAi.Compass.Abstractions.Interfaces;
 using UtilityAi.Compass.PluginHost;
 using UtilityAi.Compass.PluginSdk.Attributes;
-using UtilityAi.Compass.PluginSdk.MetadataProvider;
 using UtilityAi.Compass.Runtime.DI;
-using UtilityAi.Compass.Runtime.Modules;
-using UtilityAi.Compass.Runtime.Sensors;
-using UtilityAi.Compass.StandardModules.DI;
-using UtilityAi.Memory;
+using UtilityAi.Compass.StandardModules;
 
 // Auto-load .env.compass so the host works without manually sourcing the file.
 EnvFileLoader.Load(overwriteExisting: true);
 
 var pluginsPath = Path.Combine(AppContext.BaseDirectory, "plugins");
-const int MaxAuditRecords = 100;
 void PrintCommands() => Console.WriteLine("Commands: /help, /setup, /list-modules, /install-module <path|package@version> [--allow-unsigned], /inspect-module <path|package@version> [--json], /doctor [--json], /policy validate <policyFile>, /policy explain <request>, /audit list, /audit show <id> [--json], /replay <id> [--no-exec], /new-module <Name> [OutputPath], quit");
 string? PromptForSecret(string secretName)
 {
@@ -64,8 +58,7 @@ void PrintInstalledModules()
     var standardModules = new[]
     {
         nameof(UtilityAi.Compass.StandardModules.ConversationModule),
-        nameof(UtilityAi.Compass.StandardModules.FileReadModule),
-        nameof(UtilityAi.Compass.StandardModules.FileCreationModule),
+        nameof(UtilityAi.Compass.StandardModules.FileOperationsModule),
         nameof(UtilityAi.Compass.StandardModules.SummarizationModule),
         nameof(UtilityAi.Compass.StandardModules.WebSearchModule),
         nameof(UtilityAi.Compass.StandardModules.GmailModule)
@@ -79,34 +72,11 @@ void PrintInstalledModules()
         : $"Installed modules:{Environment.NewLine}  - {string.Join($"{Environment.NewLine}  - ", installedModules)}");
 }
 
-async Task<int> PrintAuditListAsync()
+Task<int> PrintAuditListAsync()
 {
-    var store = CreateAuditStore();
-    if (store is null)
-    {
-        Console.WriteLine("Audit unavailable: set COMPASS_MEMORY_CONNECTION_STRING to a SQLite connection string.");
-        return 1;
-    }
-
-    var records = await store.RecallAsync<ProposalExecutionRecord>(new MemoryQuery { MaxResults = MaxAuditRecords, SortOrder = SortOrder.NewestFirst });
-    if (records.Count == 0)
-    {
-        Console.WriteLine("No audit records found.");
-        return 0;
-    }
-
-    foreach (var entry in records.Select((record, i) => new { Record = record, Index = i + 1 }))
-        Console.WriteLine($"{entry.Index}: {entry.Record.Timestamp:O} {entry.Record.Fact.ProposalId} corr={entry.Record.Fact.CorrelationId ?? "n/a"}");
-
-    return 0;
-}
-
-SqliteMemoryStore? CreateAuditStore()
-{
-    var connectionString = Environment.GetEnvironmentVariable("COMPASS_MEMORY_CONNECTION_STRING");
-    if (string.IsNullOrWhiteSpace(connectionString))
-        return null;
-    return new SqliteMemoryStore(connectionString);
+    Console.WriteLine("Audit feature removed with UtilityAI package.");
+    Console.WriteLine("Audit functionality was part of the old architecture and is no longer available.");
+    return Task.FromResult(1);
 }
 
 var startupArgs = args
@@ -273,28 +243,8 @@ if (startupArgs.Length >= 3 &&
      string.Equals(startupArgs[0], "--audit", StringComparison.OrdinalIgnoreCase)) &&
     string.Equals(startupArgs[1], "show", StringComparison.OrdinalIgnoreCase))
 {
-    var store = CreateAuditStore();
-    if (store is null)
-    {
-        Console.WriteLine("Audit unavailable: set COMPASS_MEMORY_CONNECTION_STRING to a SQLite connection string.");
-        return;
-    }
-    if (!int.TryParse(startupArgs[2], out var id) || id <= 0)
-    {
-        Console.WriteLine("Audit show failed: id must be a positive integer from `compass audit list`.");
-        return;
-    }
-    var records = await store.RecallAsync<ProposalExecutionRecord>(new MemoryQuery { MaxResults = MaxAuditRecords, SortOrder = SortOrder.NewestFirst });
-    if (id > records.Count)
-    {
-        Console.WriteLine("Audit show failed: id not found.");
-        return;
-    }
-    var selected = records[id - 1];
-    if (startupArgs.Any(a => string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase)))
-        Console.WriteLine(JsonSerializer.Serialize(selected, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
-    else
-        Console.WriteLine($"{selected.Timestamp:O} proposal={selected.Fact.ProposalId} corr={selected.Fact.CorrelationId ?? "n/a"} outcome={selected.Fact.OutcomeTag?.ToString() ?? "n/a"}");
+    Console.WriteLine("Audit feature removed with UtilityAI package.");
+    Console.WriteLine("Audit functionality was part of the old architecture and is no longer available.");
     return;
 }
 
@@ -346,54 +296,65 @@ if (modelConfiguration is null && !string.IsNullOrWhiteSpace(modelConfigurationE
 var builder = Host.CreateApplicationBuilder(args);
 var memoryConnectionString = Environment.GetEnvironmentVariable("COMPASS_MEMORY_CONNECTION_STRING");
 
+// Set up working directory - defaults to "compass-workspace" in user's home directory
+var workingDirectory = Environment.GetEnvironmentVariable("COMPASS_WORKING_DIRECTORY");
+if (string.IsNullOrWhiteSpace(workingDirectory))
+{
+    var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    workingDirectory = Path.Combine(homeDir, "compass-workspace");
+}
+
+// Ensure working directory exists
+if (!Directory.Exists(workingDirectory))
+{
+    Directory.CreateDirectory(workingDirectory);
+    Console.WriteLine($"Created working directory: {workingDirectory}");
+}
+
 builder.Services.AddUtilityAiCompass(opts =>
 {
     opts.EnableGovernanceFinalizer = true;
     opts.EnableHitl = false;
     opts.MemoryConnectionString = memoryConnectionString;
+    opts.WorkingDirectory = workingDirectory;
 });
-
-builder.Services.AddCompassStandardModules();
-
-builder.Services.AddSingleton<AttributeMetadataProvider>();
-builder.Services.AddSingleton<WorkflowMetadataProvider>(sp =>
-    new WorkflowMetadataProvider(sp.GetServices<IWorkflowModule>()));
-builder.Services.AddSingleton<IProposalMetadataProvider>(sp =>
-    new CompositeMetadataProvider([
-        sp.GetRequiredService<WorkflowMetadataProvider>(),
-        sp.GetRequiredService<AttributeMetadataProvider>()
-    ]));
 
 // Register the host-level model client so plugins receive it via DI.
 // The concrete provider (OpenAI, Anthropic, Gemini) is chosen by env config.
-var httpClient = new HttpClient();
+var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 IModelClient? modelClient = modelConfiguration is not null
     ? ModelClientFactory.Create(modelConfiguration, httpClient)
     : null;
 if (modelClient is not null)
     builder.Services.AddSingleton<IModelClient>(modelClient);
 
-builder.Services.AddCompassPluginsFromFolder(pluginsPath);
+// Register modules
+builder.Services.AddSingleton<ICompassModule>(sp =>
+    new FileOperationsModule(sp.GetService<IModelClient>(), workingDirectory));
+builder.Services.AddSingleton<ICompassModule>(sp =>
+    new ConversationModule(sp.GetService<IModelClient>()));
+builder.Services.AddSingleton<ICompassModule>(sp =>
+    new WebSearchModule(sp.GetService<IModelClient>()));
+builder.Services.AddSingleton<ICompassModule>(sp =>
+    new SummarizationModule(sp.GetService<IModelClient>()));
+builder.Services.AddSingleton<ICompassModule>(sp =>
+    new GmailModule(sp.GetService<IModelClient>()));
+
+// Register module router
+builder.Services.AddSingleton<ModuleRouter>(sp =>
+    new ModuleRouter(sp.GetService<IModelClient>()));
 
 var host = builder.Build();
 
-var strategy = host.Services.GetRequiredService<UtilityAi.Compass.Runtime.Strategy.CompassGovernedSelectionStrategy>();
-var metadataProvider = host.Services.GetRequiredService<AttributeMetadataProvider>();
+// Create and configure the request processor
+var router = host.Services.GetRequiredService<ModuleRouter>();
+var requestProcessor = new RequestProcessor(host, router, modelClient);
 
-// Register all module types with the metadata provider so their attributes can be read
-// We use a wildcard pattern - any proposal starting with the domain will use this module's metadata
-foreach (var module in host.Services.GetServices<ICapabilityModule>())
+// Register all modules with the router
+foreach (var module in host.Services.GetServices<ICompassModule>())
 {
-    var moduleType = module.GetType();
-    var capabilityAttr = moduleType.GetCustomAttribute<CompassCapabilityAttribute>();
-    if (capabilityAttr is not null)
-    {
-        // Register with domain + "." so it matches proposals like "file-creation.write", "weather-web.current", etc.
-        metadataProvider.RegisterModuleType(capabilityAttr.Domain + ".", moduleType);
-    }
+    requestProcessor.RegisterModule(module);
 }
-
-var requestProcessor = new RequestProcessor(host, strategy, modelClient);
 
 var discordToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
 var discordChannelId = Environment.GetEnvironmentVariable("DISCORD_CHANNEL_ID");
@@ -410,7 +371,7 @@ if (!string.IsNullOrWhiteSpace(discordToken) && !string.IsNullOrWhiteSpace(disco
     var bridge = new DiscordChannelBridge(httpClient, discordToken, discordChannelId);
     await bridge.RunAsync(async (message, token) =>
     {
-        var (_, _, response) = await requestProcessor.ProcessAsync(message, token);
+        var response = await requestProcessor.ProcessAsync(message, token);
         return response;
     }, cts.Token);
 }
@@ -420,19 +381,9 @@ else
     PrintCommands();
     if (modelConfiguration is not null)
         Console.WriteLine($"Model provider configured: {modelConfiguration.Provider} ({modelConfiguration.Model})");
+    Console.WriteLine($"Working directory: {workingDirectory}");
 
-    // Clear conversation history on startup for fresh sessions
-    var memoryStore = host.Services.GetService<IMemoryStore>();
-    if (memoryStore is not null)
-    {
-        var existingCount = await memoryStore.CountAsync<ConversationTurn>();
-        if (existingCount > 0)
-        {
-            // Clear old conversation turns by pruning everything older than 1 second
-            await memoryStore.PruneAsync(TimeSpan.FromSeconds(1));
-            Console.WriteLine($"[Cleared {existingCount} previous conversation turns]");
-        }
-    }
+    // Conversation history removed with simplified architecture
 
     while (true)
     {
@@ -475,13 +426,12 @@ else
             continue;
         }
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
         {
-            var (goal, lane, responseText) = await requestProcessor.ProcessAsync(input, cts.Token);
+            Console.WriteLine($"[DEBUG] Calling ProcessAsync with input: '{input}'");
+            var responseText = await requestProcessor.ProcessAsync(input, cts.Token);
 
-            var laneInfo = lane is not null ? $"Lane: {lane.Lane}" : "Lane: (from module)";
-            Console.WriteLine($"  Goal: {goal?.Goal} ({goal?.Confidence:P0}), {laneInfo}");
             Console.WriteLine($"  Response: {responseText}");
         }
         catch (HttpRequestException ex)
