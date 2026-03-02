@@ -29,11 +29,8 @@ public sealed class SandboxedModuleRunner
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The module's response text.</returns>
     /// <exception cref="TimeoutException">Thrown when the module exceeds the wall-time limit.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the module violates sandbox policy.</exception>
     public async Task<string> ExecuteAsync(ICompassModule module, string request, string? userId, CancellationToken ct = default)
     {
-        ValidatePolicy(module);
-
         using var timeoutCts = new CancellationTokenSource(_policy.MaxWallTime);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
@@ -57,26 +54,5 @@ public sealed class SandboxedModuleRunner
     {
         var contextName = $"Sandbox-{Path.GetFileNameWithoutExtension(assemblyPath)}";
         return new AssemblyLoadContext(contextName, isCollectible: true);
-    }
-
-    private void ValidatePolicy(ICompassModule module)
-    {
-        var domain = module.Domain;
-
-        if (!_policy.AllowFileSystem)
-        {
-            // Policy check is declarative; actual enforcement relies on
-            // RequiresPermissionAttribute + PermissionChecker at the runtime layer.
-        }
-
-        if (!_policy.AllowNetwork)
-        {
-            // Network restrictions are documented via module metadata.
-        }
-
-        if (!_policy.AllowProcessSpawn)
-        {
-            // Process spawn restrictions are documented via module metadata.
-        }
     }
 }
