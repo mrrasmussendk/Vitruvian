@@ -59,10 +59,8 @@ internal sealed class RequestProcessor
             WebSearchModule _ => new WebSearchModule(contextAwareClient),
             SummarizationModule _ => new SummarizationModule(contextAwareClient),
             GmailModule _ => new GmailModule(contextAwareClient),
-            ShellCommandModule _ => new ShellCommandModule(contextAwareClient,
-                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "compass-workspace")),
-            FileOperationsModule fileModule => new FileOperationsModule(contextAwareClient,
-                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "compass-workspace")),
+            ShellCommandModule _ => new ShellCommandModule(contextAwareClient, GetDefaultWorkingDirectory()),
+            FileOperationsModule fileModule => new FileOperationsModule(contextAwareClient, GetDefaultWorkingDirectory()),
             _ => module // Return original if we don't know how to wrap it
         };
     }
@@ -192,4 +190,7 @@ internal sealed class RequestProcessor
 
         return text.Substring(0, maxLength) + "...";
     }
+
+    private static string GetDefaultWorkingDirectory()
+        => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "compass-workspace");
 }

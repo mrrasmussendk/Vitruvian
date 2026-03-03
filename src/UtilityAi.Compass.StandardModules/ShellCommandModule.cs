@@ -177,7 +177,7 @@ Return ONLY valid JSON in this format: {"command":"command-name","args":["arg1",
         var combined = string.IsNullOrWhiteSpace(stderr) ? stdout : $"{stdout}\n{stderr}";
         var trimmed = combined.Trim();
         if (trimmed.Length > MaxOutputLength)
-            trimmed = $"{trimmed.Substring(0, MaxOutputLength)}\n...[output truncated]";
+            trimmed = $"{trimmed[..MaxOutputLength]}\n...[output truncated]";
 
         return $"ExitCode: {process.ExitCode}\n{(string.IsNullOrWhiteSpace(trimmed) ? "(no output)" : trimmed)}";
     }
