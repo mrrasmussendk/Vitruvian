@@ -1,10 +1,10 @@
 # UtilityAi.Compass
 
-**UtilityAi.Compass** is a simplified LLM-based assistant framework with intelligent module routing and conversation context.
+**UtilityAi.Compass** is a modular, GOAP-driven AI assistant framework built on .NET. It uses **Goal-Oriented Action Planning** to decompose user requests into dependency-aware execution plans, runs independent steps in parallel, and enforces human-in-the-loop approval, caching, and memory — all before any side-effecting action fires.
 
-Compass uses natural language to route user requests to specialized modules (file operations, web search, conversation, etc.) and maintains conversation context for natural multi-turn interactions.
+Third-party modules plug in via a single interface (`ICompassModule`). The host handles planning, routing, governance, and security so module authors focus only on capability logic.
 
-**Try it now (30 seconds):**
+**Try it now:**
 
 ```bash
 git clone https://github.com/mrrasmussendk/Compass.git
@@ -16,30 +16,41 @@ dotnet run --framework net8.0 --project src/UtilityAi.Compass.Cli
 
 ## Table of Contents
 
-- [Who this is for](#who-this-is-for)
-- [Quick start](#quick-start)
+- [Who This Is For](#who-this-is-for)
+- [Quick Start](#quick-start)
 - [Features](#features)
 - [Architecture](#architecture)
+  - [GOAP Pipeline](#goap-pipeline)
+  - [Key Components](#key-components)
+  - [Execution Flow](#execution-flow)
+- [Building Your Own Module](#building-your-own-module)
+  - [Step 1: Implement ICompassModule](#step-1-implement-icompassmodule)
+  - [Step 2: Register via DI](#step-2-register-via-di)
+  - [Step 3: Drop-in Plugin (Optional)](#step-3-drop-in-plugin-optional)
+  - [Module Best Practices](#module-best-practices)
 - [CLI Usage](#cli-usage)
-- [Building Modules](#building-modules)
 - [Security & Permissions](#security--permissions)
-- [Working Directory](#working-directory)
+  - [Permission Model](#permission-model)
+  - [HITL Approval Gate](#hitl-approval-gate)
+  - [Module Sandboxing](#module-sandboxing)
 - [Configuration](#configuration)
 - [Repository Layout](#repository-layout)
+- [Contributing](#contributing)
 
 ---
 
-## Who this is for
+## Who This Is For
 
 | Your goal | Start here |
 |---|---|
-| **Use Compass CLI** | [Quick start](#quick-start) → [CLI Usage](#cli-usage) |
-| **Build custom modules** | [Building Modules](#building-modules) |
-| **Understand the architecture** | [Architecture](#architecture) |
+| **Use Compass as an assistant** | [Quick Start](#quick-start) → [CLI Usage](#cli-usage) |
+| **Build and inject custom modules** | [Building Your Own Module](#building-your-own-module) |
+| **Understand the GOAP architecture** | [Architecture](#architecture) |
+| **Contribute to the framework** | [Repository Layout](#repository-layout) → [Contributing](#contributing) |
 
 ---
 
-## Quick start
+## Quick Start
 
 ### Prerequisites
 
@@ -47,18 +58,18 @@ dotnet run --framework net8.0 --project src/UtilityAi.Compass.Cli
 - Git
 - API key for OpenAI, Anthropic, or Google Gemini
 
-### Clone and build
+### Clone, build, and test
 
 ```bash
 git clone https://github.com/mrrasmussendk/Compass.git
 cd Compass
 dotnet build
-dotnet test
+dotnet test   # 68 tests should pass
 ```
 
 ### Configure your model provider
 
-Set environment variables for your AI provider:
+Set environment variables for your preferred AI provider:
 
 **OpenAI:**
 ```bash
@@ -81,17 +92,24 @@ export COMPASS_GEMINI_API_KEY=...
 export COMPASS_MODEL_NAME=gemini-2.0-flash-exp  # Optional
 ```
 
+Or create a `.env.compass` file in the project root — it is loaded automatically:
+
+```bash
+COMPASS_MODEL_PROVIDER=OpenAI
+COMPASS_OPENAI_API_KEY=sk-...
+COMPASS_MODEL_NAME=gpt-4
+```
+
 ### Run Compass
 
 ```bash
 dotnet run --project src/UtilityAi.Compass.Cli
 ```
 
-You should see:
 ```
 Compass CLI started. Type a request (or 'quit' to exit):
 Model provider configured: OpenAi (gpt-4)
-Working directory: C:\Users\YourName\compass-workspace
+Working directory: ~/compass-workspace
 >
 ```
 
@@ -99,97 +117,212 @@ Try some requests:
 ```
 > What is the weather tomorrow?
 > Create a file called notes.txt with content "Hello World"
-> Summarize this text: [paste some text]
+> Read notes.txt then summarize it
 ```
 
 ---
 
 ## Features
 
-### 🎯 **Intelligent Module Routing**
-- LLM-based routing selects the best module for each request
-- Fallback to simple keyword matching when LLM unavailable
-- Supports compound requests (automatically splits and executes multiple steps)
-
-### 💬 **Conversation Context**
-- Maintains in-memory conversation history (last 10 turns)
-- Context-aware routing and execution
-- Natural follow-up questions work seamlessly
-
-### 📁 **File Operations**
-- Read and write files in a dedicated working directory
-- Default location: `~/compass-workspace`
-- Configurable via `COMPASS_WORKING_DIRECTORY` environment variable
-
-### 🔍 **Web Search**
-- Search the web for current information, weather, news
-- Uses LLM with web search capabilities
-
-### 📧 **Gmail Integration**
-- Read Gmail messages
-- Create draft replies (requires OAuth setup)
-
-### 📝 **Text Summarization**
-- Summarize long documents, conversations, or any text
-
-### 🗨️ **General Conversation**
-- Fallback module for general Q&A
-- Powered by your configured LLM
-
-### 🔒 **Security & Permissions**
-- Linux-style permission model (read/write/execute) with user/group/other tiers
-- Human-in-the-loop approval gate for write and destructive operations
-- Module sandboxing with configurable resource limits (CPU, memory, wall time)
-- Deny-by-default policy across all security layers
+| Feature | Description |
+|---------|-------------|
+| **GOAP Planning** | Decomposes requests into dependency-aware plans *before* execution. Multi-step tasks are broken into independent steps that run in parallel. |
+| **Multithreaded Execution** | Independent plan steps execute concurrently via `Task.WhenAll`. Dependent steps wait for their prerequisites. |
+| **Human-in-the-Loop (HITL)** | Write, delete, and execute operations are gated through `IApprovalGate`. Default-deny on timeout. Full audit trail. |
+| **Result Caching** | Identical `(module, input)` pairs return cached output, avoiding redundant LLM calls or side effects. |
+| **Plan Memory** | Every completed plan and its results are stored in memory for future reference and context. |
+| **Context Window** | A sliding window of recent step outputs is injected into downstream steps, giving each step awareness of prior results. |
+| **Conversation History** | In-memory conversation history (last 10 turns) provides context-aware routing and execution across turns. |
+| **Module Extensibility** | Implement `ICompassModule`, register via DI or drop a DLL into `plugins/` — the GOAP planner discovers it automatically. |
+| **Security** | Linux-style permissions, HITL approval, and sandboxed execution with resource limits. |
 
 ---
 
 ## Architecture
 
-### Simplified Design
+### GOAP Pipeline
 
-Compass uses a **simplified module-based architecture** without the UtilityAI orchestration layer:
+Compass uses a **Goal-Oriented Action Planning (GOAP)** architecture. Every user request passes through three phases:
 
 ```
-User Input
-    ↓
-[Conversation Context Added]
-    ↓
-[LLM Router] → Selects best module based on description
-    ↓
-[Module Execution] → Executes with full context
-    ↓
-Response
+┌─────────────────────────────────────────────────────────────┐
+│                      User Request                           │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │  Phase 1:   │
+                    │   PLAN      │  GoapPlanner creates an ExecutionPlan
+                    │             │  with PlanSteps and dependency edges
+                    └──────┬──────┘
+                           │
+              ┌────────────▼────────────┐
+              │  Phase 2: EXECUTE       │
+              │                         │
+              │  PlanExecutor runs      │
+              │  steps in dependency    │
+              │  waves:                 │
+              │                         │
+              │  Wave 1: [s1] [s2]  ◄── independent steps run in parallel
+              │  Wave 2: [s3]       ◄── depends on s1, waits for it
+              │                         │
+              │  Each step:             │
+              │  • Cache check          │
+              │  • HITL gate (writes)   │
+              │  • Context injection    │
+              │  • Module.ExecuteAsync  │
+              │  • Cache store          │
+              └────────────┬────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │  Phase 3:   │
+                    │  MEMORY     │  Store plan result + conversation turn
+                    └──────┬──────┘
+                           │
+              ┌────────────▼────────────┐
+              │       Response          │
+              └─────────────────────────┘
 ```
 
 ### Key Components
 
-**1. ICompassModule Interface**
+#### `ICompassModule` — The Module Contract
+
+Every capability — built-in or third-party — implements this single interface:
+
 ```csharp
 public interface ICompassModule
 {
-    string Domain { get; }           // e.g., "file-operations"
-    string Description { get; }      // Natural language description
+    string Domain { get; }        // Unique identifier, e.g. "file-operations"
+    string Description { get; }   // Natural language description for the planner
     Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct);
 }
 ```
 
-**2. ModuleRouter**
-- Uses LLM to select the best module based on request and module descriptions
-- Falls back to keyword matching if LLM unavailable
-- Considers cost and risk metadata when available
+#### `GoapPlanner` — Plan Before You Execute
 
-**3. RequestProcessor**
-- Manages conversation history
-- Enriches requests with context
-- Handles compound request orchestration
+The planner receives a user request and the list of registered modules. It uses the LLM to produce a `ExecutionPlan` — a graph of `PlanStep` nodes with `DependsOn` edges. Falls back to keyword-based single-step plans when no LLM is available.
 
-**4. Standard Modules**
-- `FileOperationsModule` - File I/O
-- `WebSearchModule` - Web search
-- `ConversationModule` - General Q&A
-- `SummarizationModule` - Text summarization
-- `GmailModule` - Email operations
+```csharp
+// Planning types
+record PlanStep(string StepId, string ModuleDomain, string Description,
+                string Input, IReadOnlyList<string> DependsOn);
+
+record ExecutionPlan(string PlanId, string OriginalRequest,
+                     IReadOnlyList<PlanStep> Steps, string? Rationale);
+```
+
+#### `PlanExecutor` — Parallel, Governed Execution
+
+Groups steps into dependency waves. Steps within a wave run in parallel via `Task.WhenAll`. Each step passes through:
+
+1. **Cache check** — skip execution if an identical result exists
+2. **HITL gate** — write/delete/execute operations require human approval
+3. **Context window** — recent step outputs are injected for downstream awareness
+4. **Module execution** — delegates to `ICompassModule.ExecuteAsync`
+5. **Cache store** — result is cached for future reuse
+
+After all steps complete, the plan result is persisted to in-memory storage.
+
+#### `RequestProcessor` — The Orchestrator
+
+Wires together the planner, executor, conversation history, and context-aware module wrapping. The executor is reused across requests to preserve cache and memory state.
+
+#### `ModuleRouter` — Intelligent Selection
+
+Uses LLM-based reasoning to select the best module for a request. Falls back to keyword matching when no LLM is available. Used by the planner for module assignment.
+
+### Execution Flow
+
+```
+1. User types: "Read notes.txt then summarize it"
+2. GoapPlanner produces:
+   Step s1: file-operations → "Read notes.txt"       (depends_on: [])
+   Step s2: summarization   → "Summarize the content" (depends_on: [s1])
+3. PlanExecutor runs:
+   Wave 1: executes s1 (file read — no HITL needed for reads)
+   Wave 2: executes s2 (gets s1 output via context window)
+4. Results aggregated and returned to user
+5. Plan result stored in memory; conversation turn stored in history
+```
+
+---
+
+## Building Your Own Module
+
+Compass is designed so that anyone can build and inject custom modules. The GOAP planner automatically discovers registered modules and includes them in planning.
+
+### Step 1: Implement `ICompassModule`
+
+Create a class library targeting `net8.0` and reference `UtilityAi.Compass.Abstractions`:
+
+```csharp
+using UtilityAi.Compass.Abstractions.Interfaces;
+
+public sealed class TranslationModule : ICompassModule
+{
+    private readonly IModelClient? _modelClient;
+
+    public string Domain => "translation";
+    public string Description => "Translate text between languages using AI";
+
+    public TranslationModule(IModelClient? modelClient = null)
+    {
+        _modelClient = modelClient;
+    }
+
+    public async Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
+    {
+        if (_modelClient is null)
+            return "No model configured for translation.";
+
+        return await _modelClient.GenerateAsync(
+            $"Translate the following as requested: {request}", ct);
+    }
+}
+```
+
+### Step 2: Register via DI
+
+Add your module to the DI container in `Program.cs`. The `RequestProcessor` picks it up automatically:
+
+```csharp
+builder.Services.AddSingleton<ICompassModule>(sp =>
+    new TranslationModule(sp.GetService<IModelClient>()));
+```
+
+That's it. The GOAP planner will now include `translation` as an available module when creating plans. If a user says *"Translate this text to French"*, the planner will route it to your module.
+
+### Step 3: Drop-in Plugin (Optional)
+
+For plugin-based deployment without recompiling the host:
+
+1. Build your module as a class library DLL
+2. Drop it into the `plugins/` folder next to the CLI executable
+3. Restart Compass — the `PluginHost` discovers and loads it via `AssemblyLoadContext`
+
+You can also use SDK attributes for governance metadata:
+
+```csharp
+using UtilityAi.Compass.PluginSdk.Attributes;
+
+[CompassCapability("translation", priority: 5)]
+[CompassGoals(GoalTag.Answer)]
+[CompassLane(Lane.Execute)]
+[CompassCost(0.1)]
+[CompassRisk(0.0)]
+public sealed class TranslationModule : ICompassModule { /* ... */ }
+```
+
+### Module Best Practices
+
+| Practice | Why |
+|----------|-----|
+| **Write a clear `Description`** | The GOAP planner and LLM router use this to decide when to invoke your module. Be specific: *"Translate text between languages using AI"* not *"Does stuff"*. |
+| **Accept `IModelClient?` as optional** | Allows your module to work in environments without an LLM (graceful degradation). |
+| **Return user-friendly error messages** | Errors bubble up as plan step results. Clear messages help users understand what happened. |
+| **Use `sealed`** | Mark your module class as `sealed` unless inheritance is intentional. |
+| **Keep `ExecuteAsync` focused** | One responsibility per module. The GOAP planner handles orchestration across modules. |
+| **Declare permissions** | Use `[RequiresPermission]` to declare what access your module needs. The runtime enforces this before execution. |
 
 ---
 
@@ -197,20 +330,28 @@ public interface ICompassModule
 
 ### Interactive Mode
 
-Start Compass and type natural language requests:
-
 ```bash
+dotnet run --project src/UtilityAi.Compass.Cli
+```
+
+Type natural language requests:
+
+```
 > Read the file notes.txt
 > What is the weather in Copenhagen?
-> Summarize this article: [paste text]
+> Create todo.txt with content "Buy milk" then read it back
 ```
 
 ### Commands
 
-- `/help` - Show available commands
-- `/setup` - Run guided setup (if available)
-- `/list-modules` - List registered modules
-- `quit` - Exit
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/setup` | Run guided setup |
+| `/list-modules` | List all registered modules |
+| `/install-module <path>` | Install a plugin module |
+| `/new-module <Name>` | Scaffold a new module project |
+| `quit` | Exit |
 
 ### Conversation Flow
 
@@ -224,79 +365,19 @@ Assistant: I need your location. What city are you in?
 Assistant: [Provides Copenhagen weather forecast]
 ```
 
-The second message "Copenhagen" is understood in the context of the weather question.
-
----
-
-## Building Modules
-
-### Create a Module
-
-Modules implement the `ICompassModule` interface:
-
-```csharp
-using UtilityAi.Compass.Abstractions.Interfaces;
-
-public sealed class MyModule : ICompassModule
-{
-    private readonly IModelClient? _modelClient;
-
-    public string Domain => "my-domain";
-    public string Description => "Describe what your module does for LLM routing";
-
-    public MyModule(IModelClient? modelClient = null)
-    {
-        _modelClient = modelClient;
-    }
-
-    public async Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
-    {
-        // Your implementation here
-        if (_modelClient is null)
-            return "No model configured.";
-
-        // Use the LLM to help process the request
-        return await _modelClient.GenerateAsync(request, ct);
-    }
-}
-```
-
-### Register Your Module
-
-In `Program.cs`:
-
-```csharp
-builder.Services.AddSingleton<ICompassModule>(sp =>
-    new MyModule(sp.GetService<IModelClient>()));
-```
-
-### Best Practices
-
-1. **Clear Descriptions**: Write descriptions that help the LLM router understand when to use your module
-   - Good: `"Search the web for current information, weather forecasts, news, and real-time data"`
-   - Bad: `"Web stuff"`
-
-2. **Handle Context**: The `request` parameter includes conversation context when available
-   - Parse context markers like `[Recent conversation context:...]`
-
-3. **Use IModelClient**: Inject and use `IModelClient` for LLM capabilities
-
-4. **Error Handling**: Return user-friendly error messages
+The second message is understood in the context of the weather question thanks to the conversation history (last 10 turns).
 
 ---
 
 ## Security & Permissions
 
-Compass enforces a layered security model for all module execution. For the full reference, see [`docs/SECURITY.md`](docs/SECURITY.md).
+Compass enforces a layered security model. For the full reference, see [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ### Permission Model
 
-Modules declare required access using the `[RequiresPermission]` attribute. The runtime validates declarations against the active `IPermissionContext` before execution.
+Modules declare required access using `[RequiresPermission]`. The runtime validates these against the active `IPermissionContext` before execution:
 
 ```csharp
-using UtilityAi.Compass.Abstractions;
-using UtilityAi.Compass.PluginSdk.Attributes;
-
 [RequiresPermission(ModuleAccess.Read)]
 [RequiresPermission(ModuleAccess.Write, resource: "files/*")]
 public sealed class SecureFileModule : ICompassModule
@@ -306,13 +387,12 @@ public sealed class SecureFileModule : ICompassModule
 
     public async Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
     {
-        // Module implementation — runtime enforces permissions before this runs
         return "done";
     }
 }
 ```
 
-Enforcement at runtime:
+Enforcement:
 
 ```csharp
 var checker = new PermissionChecker(permissionContext);
@@ -321,7 +401,7 @@ checker.Enforce(module, userId, group); // throws PermissionDeniedException if d
 
 ### HITL Approval Gate
 
-Write and destructive operations require explicit human approval via `IApprovalGate`:
+The `PlanExecutor` automatically gates write, delete, and execute operations through `IApprovalGate` during plan execution. You can also use it directly:
 
 ```csharp
 IApprovalGate gate = new ConsoleApprovalGate(timeout: TimeSpan.FromSeconds(30));
@@ -329,8 +409,9 @@ bool approved = await gate.ApproveAsync(
     OperationType.Write, "Write config.json", module.Domain);
 ```
 
-- **Default-deny**: unanswered prompts are automatically denied after timeout.
-- **Audit trail**: every decision is recorded as an `ApprovalRecord`.
+- **Default-deny**: unanswered prompts are automatically denied after timeout
+- **Audit trail**: every decision is recorded as an `ApprovalRecord`
+- **Plan-level**: HITL runs during plan execution, so the full plan is visible before any side effects fire
 
 ### Module Sandboxing
 
@@ -346,35 +427,7 @@ var runner = new SandboxedModuleRunner(new DefaultSandboxPolicy
 string result = await runner.ExecuteAsync(module, request, userId);
 ```
 
-Default sandbox limits: 30 s CPU, 256 MB memory, 60 s wall time, no file system / network / process access.
-
----
-
-## Working Directory
-
-### Default Location
-
-Files are stored in: `~/compass-workspace` (or `C:\Users\YourName\compass-workspace` on Windows)
-
-### Custom Location
-
-Set the environment variable:
-
-```bash
-export COMPASS_WORKING_DIRECTORY=/path/to/your/workspace
-```
-
-### File Operations
-
-```
-> Create a file called todo.txt with content "Buy milk"
-File created: todo.txt
-
-> Read the content of todo.txt
-Buy milk
-```
-
-Files are created in the working directory by default. You can also use absolute paths if needed.
+Default limits: 30 s CPU, 256 MB memory, 60 s wall time, no file system / network / process access.
 
 ---
 
@@ -384,16 +437,17 @@ Files are created in the working directory by default. You can also use absolute
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `COMPASS_MODEL_PROVIDER` | AI provider: `OpenAI`, `Anthropic`, or `Gemini` | - |
-| `COMPASS_OPENAI_API_KEY` | OpenAI API key | - |
-| `COMPASS_ANTHROPIC_API_KEY` | Anthropic API key | - |
-| `COMPASS_GEMINI_API_KEY` | Google Gemini API key | - |
+| `COMPASS_MODEL_PROVIDER` | AI provider: `OpenAI`, `Anthropic`, or `Gemini` | — |
+| `COMPASS_OPENAI_API_KEY` | OpenAI API key | — |
+| `COMPASS_ANTHROPIC_API_KEY` | Anthropic API key | — |
+| `COMPASS_GEMINI_API_KEY` | Google Gemini API key | — |
 | `COMPASS_MODEL_NAME` | Specific model to use | Provider default |
 | `COMPASS_WORKING_DIRECTORY` | File operations directory | `~/compass-workspace` |
+| `COMPASS_MEMORY_CONNECTION_STRING` | SQLite connection string for durable memory | In-memory |
 
 ### .env.compass File
 
-Create a `.env.compass` file in the project root:
+Create a `.env.compass` file in the project root (loaded automatically):
 
 ```bash
 COMPASS_MODEL_PROVIDER=OpenAI
@@ -402,6 +456,10 @@ COMPASS_MODEL_NAME=gpt-4
 COMPASS_WORKING_DIRECTORY=/custom/path
 ```
 
+### Working Directory
+
+File operations use a dedicated directory (default: `~/compass-workspace`). Override with `COMPASS_WORKING_DIRECTORY`.
+
 ---
 
 ## Repository Layout
@@ -409,16 +467,23 @@ COMPASS_WORKING_DIRECTORY=/custom/path
 ```text
 UtilityAi.Compass.sln
 ├── src/
-│   ├── UtilityAi.Compass.Abstractions/     # Core interfaces, enums, and facts
-│   ├── UtilityAi.Compass.Runtime/          # Routing, orchestration, permission enforcement
-│   ├── UtilityAi.Compass.StandardModules/  # Built-in modules
-│   ├── UtilityAi.Compass.PluginSdk/        # SDK attributes for module development
-│   ├── UtilityAi.Compass.PluginHost/       # Plugin loading, sandboxing, manifests
-│   ├── UtilityAi.Compass.Hitl/             # Human-in-the-loop approval gates
-│   ├── UtilityAi.Compass.WeatherModule/    # Example weather module
-│   └── UtilityAi.Compass.Cli/              # CLI application
+│   ├── UtilityAi.Compass.Abstractions/     # Core interfaces (ICompassModule, IApprovalGate,
+│   │                                        #   IModelClient), enums, facts, planning types
+│   ├── UtilityAi.Compass.Runtime/          # GoapPlanner, PlanExecutor, ModuleRouter,
+│   │                                        #   PermissionChecker, CompoundRequestOrchestrator
+│   ├── UtilityAi.Compass.StandardModules/  # Built-in modules (File, Conversation, Web,
+│   │                                        #   Summarization, Gmail, Shell)
+│   ├── UtilityAi.Compass.PluginSdk/        # SDK attributes for module metadata
+│   │                                        #   (CompassCapability, CompassGoals, etc.)
+│   ├── UtilityAi.Compass.PluginHost/       # Plugin loading via AssemblyLoadContext,
+│   │                                        #   SandboxedModuleRunner
+│   ├── UtilityAi.Compass.Hitl/             # ConsoleApprovalGate, HITL facts
+│   ├── UtilityAi.Compass.WeatherModule/    # Example standalone module
+│   └── UtilityAi.Compass.Cli/              # CLI entry point, RequestProcessor,
+│                                            #   ContextAwareModelClient, ModelClientFactory
 ├── tests/
-│   └── UtilityAi.Compass.Tests/            # Unit tests
+│   └── UtilityAi.Compass.Tests/            # 68 xUnit tests (planner, executor, router,
+│                                            #   modules, permissions, sandboxing, HITL)
 └── docs/
     ├── SECURITY.md                          # Security model reference
     ├── EXTENDING.md                         # Plugin development guide
@@ -428,21 +493,21 @@ UtilityAi.Compass.sln
 
 ---
 
-## License
-
-See LICENSE file for details.
-
----
-
 ## Contributing
 
 Contributions welcome! Please:
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Write/update tests
+3. Make your changes following the existing patterns
+4. Write or update tests (target: all tests green)
 5. Submit a pull request
+
+---
+
+## License
+
+See LICENSE file for details.
 
 ---
 
