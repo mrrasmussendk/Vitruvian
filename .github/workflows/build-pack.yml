@@ -131,16 +131,16 @@ jobs:
             exit 1
           fi
 
-          # Sanitize: strip whitespace, surrounding quotes, BOM, and non-printable characters
+          # Sanitize: strip BOM, non-printable characters, whitespace, and surrounding quotes
           NUGET_API_KEY="$(printf '%s' "$NUGET_API_KEY" \
             | sed 's/^\xEF\xBB\xBF//' \
+            | tr -cd '[:print:]' \
             | tr -d '[:space:]' \
-            | sed "s/^['\"]//; s/['\"]$//" \
-            | tr -cd '[:print:]')"
+            | sed "s/^['\"]//; s/['\"]$//")"
 
           echo "Sanitized API key length: ${#NUGET_API_KEY}"
-          if [ "${#NUGET_API_KEY}" -lt 10 ]; then
-            echo "::error::NUGET_API_KEY is too short (${#NUGET_API_KEY} chars) after sanitization. Please update the secret with a valid NuGet API key."
+          if [ "${#NUGET_API_KEY}" -lt 32 ]; then
+            echo "::error::NUGET_API_KEY is too short (${#NUGET_API_KEY} chars) after sanitization — NuGet API keys are typically 46 characters. Please re-copy the key from https://www.nuget.org/account/apikeys"
             exit 1
           fi
 
