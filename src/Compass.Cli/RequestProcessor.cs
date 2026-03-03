@@ -14,7 +14,7 @@ namespace Compass.Cli;
 /// GOAP-style request processor that creates a plan before executing.
 /// Pipeline: Request → GoapPlanner → [HITL plan review] → PlanExecutor (parallel) → Memory + Cache → Response.
 /// </summary>
-internal sealed class RequestProcessor
+public sealed class RequestProcessor
 {
     private readonly IHost _host;
     private readonly ModuleRouter _router;

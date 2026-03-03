@@ -59,6 +59,7 @@ void PrintInstalledModules()
     {
         nameof(Compass.StandardModules.ConversationModule),
         nameof(Compass.StandardModules.FileOperationsModule),
+        nameof(Compass.StandardModules.ShellCommandModule),
         nameof(Compass.StandardModules.SummarizationModule),
         nameof(Compass.StandardModules.WebSearchModule),
         nameof(Compass.StandardModules.GmailModule)
@@ -353,7 +354,8 @@ var host = builder.Build();
 
 // Create and configure the request processor
 var router = host.Services.GetRequiredService<ModuleRouter>();
-var requestProcessor = new RequestProcessor(host, router, modelClient);
+var approvalGate = new Compass.Hitl.ConsoleApprovalGate(timeout: TimeSpan.FromSeconds(30));
+var requestProcessor = new RequestProcessor(host, router, modelClient, approvalGate);
 
 // Register all modules with the router
 foreach (var module in host.Services.GetServices<ICompassModule>())

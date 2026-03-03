@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Compass.Abstractions;
 using Compass.Abstractions.Interfaces;
+using Compass.PluginSdk.Attributes;
 
 namespace Compass.StandardModules;
 
@@ -8,35 +10,82 @@ namespace Compass.StandardModules;
 /// Shell command module implementing ICompassModule.
 /// Executes a guarded allowlist of commands in the configured working directory.
 /// </summary>
+[RequiresPermission(ModuleAccess.Execute)]
+[RequiresPermission(ModuleAccess.Read)]
 public sealed class ShellCommandModule : ICompassModule
 {
-    private const string CommandParsingPrompt = """
+    private static readonly string CommandParsingPrompt = OperatingSystem.IsWindows()
+        ? """
 Determine which command should be executed from the user request.
 Return ONLY valid JSON in this format: {"command":"command-name","args":["arg1","arg2"]}
 - command: executable name only, no shell wrappers
 - args: argument array (empty array if no args)
+
+IMPORTANT: This system is running Windows. Use Windows-native commands:
+- Current directory: {"command":"cmd","args":["/c","cd"]}
+- List files: {"command":"cmd","args":["/c","dir"]}
+- List files in path: {"command":"cmd","args":["/c","dir","C:\\path"]}
+- Display file contents: {"command":"cmd","args":["/c","type","filename.txt"]}
+- Echo/print text: {"command":"cmd","args":["/c","echo","some text"]}
+- System version: {"command":"cmd","args":["/c","ver"]}
+- Current user: {"command":"whoami","args":[]}
+- Git commands: {"command":"git","args":["status"]} (git is cross-platform)
+- Dotnet commands: {"command":"dotnet","args":["--version"]} (dotnet is cross-platform)
+
+DO NOT use Unix commands like pwd, ls, cat - they don't exist on Windows.
+"""
+        : """
+Determine which command should be executed from the user request.
+Return ONLY valid JSON in this format: {"command":"command-name","args":["arg1","arg2"]}
+- command: executable name only, no shell wrappers
+- args: argument array (empty array if no args)
+
+IMPORTANT: This system is running Unix/Linux/macOS. Use Unix-native commands:
+- Current directory: {"command":"pwd","args":[]}
+- List files: {"command":"ls","args":[]}
+- List files in path: {"command":"ls","args":["/path"]}
+- Display file contents: {"command":"cat","args":["filename.txt"]}
+- Echo/print text: {"command":"echo","args":["some text"]}
+- System info: {"command":"uname","args":["-a"]}
+- Current user: {"command":"whoami","args":[]}
+- Git commands: {"command":"git","args":["status"]}
+- Dotnet commands: {"command":"dotnet","args":["--version"]}
 """;
     private const int MaxOutputLength = 8_000;
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(15);
-    private static readonly string[] DefaultAllowedCommands =
-    [
-        "cat",
-        "date",
-        "dotnet",
-        "echo",
-        "git",
-        "ls",
-        "pwd",
-        "uname",
-        "whoami"
-    ];
+    private static readonly string[] DefaultAllowedCommands = OperatingSystem.IsWindows()
+        ? [
+            "cmd",
+            "date",
+            "dir",
+            "dotnet",
+            "echo",
+            "git",
+            "powershell",
+            "type",
+            "where",
+            "whoami"
+        ]
+        : [
+            "cat",
+            "date",
+            "dotnet",
+            "echo",
+            "git",
+            "ls",
+            "pwd",
+            "uname",
+            "whoami"
+        ];
 
     private readonly IModelClient? _modelClient;
     private readonly string _workingDirectory;
     private readonly HashSet<string> _allowedCommands;
 
     public string Domain => "shell-command";
-    public string Description => "Execute approved shell/command-line operations for development workflows (e.g., dotnet --version, git status, ls)";
+    public string Description => OperatingSystem.IsWindows()
+        ? "Execute approved Windows command-line operations (cmd, dir, type, git, dotnet, etc.)"
+        : "Execute approved shell/command-line operations (ls, pwd, cat, git, dotnet, etc.)";
 
     public ShellCommandModule(
         IModelClient? modelClient = null,
@@ -68,7 +117,7 @@ Return ONLY valid JSON in this format: {"command":"command-name","args":["arg1",
     private async Task<CommandInvocation> DetermineCommandInvocationAsync(string request, CancellationToken ct)
     {
         if (_modelClient is null)
-            return ParseCommandLine(request);
+            return TranslateForPlatform(ParseCommandLine(request));
 
         try
         {
@@ -77,12 +126,30 @@ Return ONLY valid JSON in this format: {"command":"command-name","args":["arg1",
                 userMessage: $"Analyze this shell/command request: {request}",
                 cancellationToken: ct);
 
-            return ParseCommandResponse(response);
+            return TranslateForPlatform(ParseCommandResponse(response));
         }
         catch
         {
-            return ParseCommandLine(request);
+            return TranslateForPlatform(ParseCommandLine(request));
         }
+    }
+
+    private static CommandInvocation TranslateForPlatform(CommandInvocation invocation)
+    {
+        if (!OperatingSystem.IsWindows())
+            return invocation;
+
+        // Translate common Unix commands to Windows equivalents
+        return invocation.Command.ToLowerInvariant() switch
+        {
+            "pwd" => new CommandInvocation("cmd", ["/c", "cd"]),
+            "ls" when invocation.Args.Length == 0 => new CommandInvocation("cmd", ["/c", "dir"]),
+            "ls" => new CommandInvocation("cmd", ["/c", "dir", .. invocation.Args]),
+            "cat" when invocation.Args.Length > 0 => new CommandInvocation("cmd", ["/c", "type", .. invocation.Args]),
+            "echo" => new CommandInvocation("cmd", ["/c", "echo", .. invocation.Args]),
+            "uname" => new CommandInvocation("cmd", ["/c", "ver"]),
+            _ => invocation
+        };
     }
 
     private static CommandInvocation ParseCommandResponse(string response)
