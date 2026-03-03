@@ -10,6 +10,13 @@ namespace UtilityAi.Compass.StandardModules;
 public sealed class FileOperationsModule : ICompassModule
 {
     private const string SkillResourceName = "UtilityAi.Compass.StandardModules.skill.md";
+    private const string DefaultFileOperationSkill = """
+Determine the file operation type and extract parameters.
+Return ONLY valid JSON in this format: {"type":"read"|"write","path":"filename.ext","content":"content if write, null if read"}
+- type: 'read' for reading/showing/outputting files, 'write' for creating/writing files
+- path: the exact filename mentioned
+- content: file content if writing, null if reading
+""";
     private static readonly string FileOperationSkill = LoadFileOperationSkill();
     private readonly IModelClient? _modelClient;
     private readonly string _workingDirectory;
@@ -156,7 +163,7 @@ public sealed class FileOperationsModule : ICompassModule
     {
         using var stream = typeof(FileOperationsModule).Assembly.GetManifestResourceStream(SkillResourceName);
         if (stream is null)
-            return "Determine the file operation type and extract parameters.";
+            return DefaultFileOperationSkill;
 
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();

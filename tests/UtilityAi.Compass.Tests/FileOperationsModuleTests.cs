@@ -130,6 +130,8 @@ public sealed class FileOperationsModuleTests
             await module.ExecuteAsync("create test.txt with hello", null, CancellationToken.None);
 
             Assert.Contains("FILE_OPERATIONS_SKILL_V1", modelClient.LastSystemMessage);
+            Assert.Contains("Determine the file operation type and extract parameters.", modelClient.LastSystemMessage);
+            Assert.Contains(@"{""type"":""read""|""write""", modelClient.LastSystemMessage);
         }
         finally
         {
