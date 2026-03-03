@@ -91,7 +91,7 @@ if (startupArgs.Length >= 1 &&
     (string.Equals(startupArgs[0], "--help", StringComparison.OrdinalIgnoreCase) ||
      string.Equals(startupArgs[0], "/help", StringComparison.OrdinalIgnoreCase)))
 {
-    Console.WriteLine("Compass CLI arguments:");
+    Console.WriteLine("Vitruvian CLI arguments:");
     Console.WriteLine("  --help");
     Console.WriteLine("  --setup");
     Console.WriteLine("  --list-modules");
@@ -106,8 +106,8 @@ if (startupArgs.Length >= 1 &&
     Console.WriteLine("  --new-module <Name> [OutputPath]");
     Console.WriteLine();
     Console.WriteLine("Getting started:");
-    Console.WriteLine("  1) compass --setup");
-    Console.WriteLine("  2) compass");
+    Console.WriteLine("  1) vitruvian --setup");
+    Console.WriteLine("  2) vitruvian");
     Console.WriteLine("  3) In interactive mode, type /help for commands or 'quit' to exit.");
     return;
 }
@@ -129,7 +129,7 @@ if (startupArgs.Length >= 2 &&
     Console.WriteLine(installResult.Message);
     if (!installResult.Success)
         Environment.ExitCode = 1;
-    Console.WriteLine("Restart Compass CLI to load the new module.");
+    Console.WriteLine("Restart Vitruvian CLI to load the new module.");
     return;
 }
 
@@ -164,7 +164,7 @@ if (startupArgs.Length >= 1 &&
     var hasUnsigned = ModuleInstaller.ListInstalledModules(pluginsPath).Any();
     var findings = new List<string>();
     if (hasUnsigned)
-        findings.Add("Installed modules should be inspected with `compass inspect-module` and signed by default.");
+        findings.Add("Installed modules should be inspected with `vitruvian inspect-module` and signed by default.");
     if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("COMPASS_MEMORY_CONNECTION_STRING")))
         findings.Add("Audit store not configured. Set COMPASS_MEMORY_CONNECTION_STRING to SQLite for deterministic audit.");
     if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("COMPASS_SECRET_PROVIDER")))
@@ -274,8 +274,8 @@ if (startupArgs.Length >= 1 &&
      string.Equals(startupArgs[0], "/setup", StringComparison.OrdinalIgnoreCase)))
 {
     Console.WriteLine(ModuleInstaller.TryRunInstallScript()
-        ? "Compass setup complete."
-        : "Compass setup script could not be started. Ensure scripts/install.sh or scripts/install.ps1 exists next to the app.");
+        ? "Vitruvian setup complete."
+        : "Vitruvian setup script could not be started. Ensure scripts/install.sh or scripts/install.ps1 exists next to the app.");
     return;
 }
 
@@ -284,7 +284,7 @@ if (!ModelConfiguration.TryCreateFromEnvironment(out var modelConfiguration, out
     EnvFileLoader.FindFile([Directory.GetCurrentDirectory(), AppContext.BaseDirectory]) is null &&
     !Console.IsInputRedirected)
 {
-    Console.WriteLine("No Compass setup found. Running installer...");
+    Console.WriteLine("No Vitruvian setup found. Running installer...");
     if (ModuleInstaller.TryRunInstallScript())
     {
         EnvFileLoader.Load(overwriteExisting: true);
@@ -367,7 +367,7 @@ var discordToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
 var discordChannelId = Environment.GetEnvironmentVariable("DISCORD_CHANNEL_ID");
 if (!string.IsNullOrWhiteSpace(discordToken) && !string.IsNullOrWhiteSpace(discordChannelId))
 {
-    Console.WriteLine("Compass CLI started in Discord mode.");
+    Console.WriteLine("Vitruvian CLI started in Discord mode.");
     using var cts = new CancellationTokenSource();
     Console.CancelKeyPress += (_, e) =>
     {
@@ -384,7 +384,7 @@ if (!string.IsNullOrWhiteSpace(discordToken) && !string.IsNullOrWhiteSpace(disco
 }
 else
 {
-    Console.WriteLine("Compass CLI started. Type a request (or 'quit' to exit):");
+    Console.WriteLine("Vitruvian CLI started. Type a request (or 'quit' to exit):");
     PrintCommands();
     if (modelConfiguration is not null)
         Console.WriteLine($"Model provider configured: {modelConfiguration.Provider} ({modelConfiguration.Model})");
@@ -408,8 +408,8 @@ else
         if (string.Equals(input.Trim(), "/setup", StringComparison.OrdinalIgnoreCase))
         {
             Console.WriteLine(ModuleInstaller.TryRunInstallScript()
-                ? "Compass setup complete."
-                : "Compass setup script could not be started. Ensure scripts/install.sh or scripts/install.ps1 exists next to the app.");
+                ? "Vitruvian setup complete."
+                : "Vitruvian setup script could not be started. Ensure scripts/install.sh or scripts/install.ps1 exists next to the app.");
             continue;
         }
 
@@ -423,7 +423,7 @@ else
         {
             var installResult = await ModuleInstaller.InstallWithResultAsync(moduleSpec, pluginsPath, allowUnsigned, PromptForSecret);
             Console.WriteLine($"  {installResult.Message}");
-            Console.WriteLine("  Restart Compass CLI to load the new module.");
+            Console.WriteLine("  Restart Vitruvian CLI to load the new module.");
             continue;
         }
 
@@ -456,4 +456,4 @@ else
     }
 }
 
-Console.WriteLine("Compass CLI stopped.");
+Console.WriteLine("Vitruvian CLI stopped.");

@@ -1,12 +1,12 @@
-# UtilityAi.Compass
+# UtilityAi.Vitruvian
 
 A modular orchestration framework built on top of [UtilityAi](https://github.com/mrrasmussendk/UtilityAi) that adds governance, plugin hosting, goal routing, and human-in-the-loop support.
 
 ## Documentation paths
 
-- **Using Compass**: [USING.md](USING.md)
-- **Extending Compass**: [EXTENDING.md](EXTENDING.md)
-- **Contributing to Compass**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Using Vitruvian**: [USING.md](USING.md)
+- **Extending Vitruvian**: [EXTENDING.md](EXTENDING.md)
+- **Contributing to Vitruvian**: [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Installation details**: [INSTALL.md](INSTALL.md)
 - **Governance pipeline**: [GOVERNANCE.md](GOVERNANCE.md)
 - **Policy reference**: [POLICY.md](POLICY.md)
@@ -53,7 +53,7 @@ builder.Services.AddSingleton<IProposalMetadataProvider>(sp =>
 
 ## CLI Actions
 
-Compass provides discoverable command-line **read**, **write**, and **update** actions that integrate with the shared UtilityAI intent detection and routing pipeline.
+Vitruvian provides discoverable command-line **read**, **write**, and **update** actions that integrate with the shared UtilityAI intent detection and routing pipeline.
 
 ### CliVerb Enum
 
