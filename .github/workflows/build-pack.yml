@@ -44,8 +44,8 @@ jobs:
           from pathlib import Path
 
           projects = [
-              Path("src/UtilityAi.Compass.Cli/UtilityAi.Compass.Cli.csproj"),
-              Path("src/UtilityAi.Compass.WeatherModule/UtilityAi.Compass.WeatherModule.csproj"),
+              Path("src/Compass.Cli/Compass.Cli.csproj"),
+              Path("src/Compass.WeatherModule/Compass.WeatherModule.csproj"),
           ]
 
           for project in projects:
@@ -96,7 +96,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/UtilityAi.Compass.Cli/UtilityAi.Compass.Cli.csproj src/UtilityAi.Compass.WeatherModule/UtilityAi.Compass.WeatherModule.csproj
+          git add src/Compass.Cli/Compass.Cli.csproj src/Compass.WeatherModule/Compass.WeatherModule.csproj
           git commit -m "chore: bump package versions [skip ci]"
           git push
 
@@ -106,19 +106,19 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore UtilityAi.Compass.sln
+        run: dotnet restore Compass.sln
 
       - name: Build
-        run: dotnet build UtilityAi.Compass.sln -c Release --no-restore
+        run: dotnet build Compass.sln -c Release --no-restore
 
       - name: Test
-        run: dotnet test UtilityAi.Compass.sln -c Release --no-build --filter "FullyQualifiedName!~PackagingTests"
+        run: dotnet test Compass.sln -c Release --no-build --filter "FullyQualifiedName!~PackagingTests"
 
       - name: Pack Compass tool
-        run: dotnet pack src/UtilityAi.Compass.Cli/UtilityAi.Compass.Cli.csproj -c Release -o artifacts
+        run: dotnet pack src/Compass.Cli/Compass.Cli.csproj -c Release -o artifacts
 
       - name: Pack Weather module
-        run: dotnet pack src/UtilityAi.Compass.WeatherModule/UtilityAi.Compass.WeatherModule.csproj -c Release -o artifacts
+        run: dotnet pack src/Compass.WeatherModule/Compass.WeatherModule.csproj -c Release -o artifacts
 
       - name: Publish to NuGet
         if: matrix.os == 'ubuntu-latest' && (inputs.bump_and_publish == true || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))
