@@ -19,7 +19,7 @@
     <Version>0.0.0</Version>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>compass</ToolCommandName>
-    <PackageId>Compass.Cli</PackageId>
+    <PackageId>Compass</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
