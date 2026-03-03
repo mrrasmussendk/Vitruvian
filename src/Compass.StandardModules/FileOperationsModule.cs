@@ -9,7 +9,7 @@ namespace Compass.StandardModules;
 /// </summary>
 public sealed class FileOperationsModule : ICompassModule
 {
-    private const string SkillResourceName = "UtilityAi.Compass.StandardModules.skill.md";
+    private const string SkillResourceName = "Compass.StandardModules.skill.md";
     private const string DefaultFileOperationSkill = """
 Determine the file operation type and extract parameters.
 Return ONLY valid JSON in this format: {"type":"read"|"write","path":"filename.ext","content":"content if write, null if read"}

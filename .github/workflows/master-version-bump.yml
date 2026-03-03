@@ -26,8 +26,8 @@ jobs:
           from pathlib import Path
 
           projects = [
-              Path("src/UtilityAi.Compass.Cli/UtilityAi.Compass.Cli.csproj"),
-              Path("src/UtilityAi.Compass.WeatherModule/UtilityAi.Compass.WeatherModule.csproj"),
+              Path("src/Compass.Cli/Compass.Cli.csproj"),
+              Path("src/Compass.WeatherModule/Compass.WeatherModule.csproj"),
           ]
 
           for project in projects:
@@ -79,6 +79,6 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/UtilityAi.Compass.Cli/UtilityAi.Compass.Cli.csproj src/UtilityAi.Compass.WeatherModule/UtilityAi.Compass.WeatherModule.csproj
+          git add src/Compass.Cli/Compass.Cli.csproj src/Compass.WeatherModule/Compass.WeatherModule.csproj
           git commit -m "chore: bump package versions"
           git push
