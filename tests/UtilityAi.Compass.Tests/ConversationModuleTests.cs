@@ -31,7 +31,7 @@ public sealed class ConversationModuleTests
         var module = new ConversationModule();
 
         Assert.Equal("conversation", module.Domain);
-        Assert.Equal("Answer general questions using conversational AI", module.Description);
+        Assert.Equal("Answer general questions, provide explanations, and have conversations (fallback for queries not handled by specialized modules)", module.Description);
     }
 
     [Fact]

@@ -49,6 +49,7 @@ public sealed class SimpleRequestProcessorTests
     public async Task ProcessAsync_WithNoModules_ReturnsFallback()
     {
         var host = Host.CreateDefaultBuilder()
+            .UseContentRoot(Path.GetTempPath())
             .ConfigureServices(services => { })
             .Build();
 
@@ -65,6 +66,7 @@ public sealed class SimpleRequestProcessorTests
     public async Task ProcessAsync_WithMatchingModule_ExecutesModule()
     {
         var host = Host.CreateDefaultBuilder()
+            .UseContentRoot(Path.GetTempPath())
             .ConfigureServices(services => { })
             .Build();
 
@@ -83,6 +85,7 @@ public sealed class SimpleRequestProcessorTests
     public async Task ProcessAsync_WithNoModelClient_ReturnsError()
     {
         var host = Host.CreateDefaultBuilder()
+            .UseContentRoot(Path.GetTempPath())
             .ConfigureServices(services => { })
             .Build();
 
