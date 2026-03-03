@@ -111,10 +111,13 @@ public static class ModuleInstaller
             return false;
 
         const string command = "/install-module";
-        if (!input.TrimStart().StartsWith(command, StringComparison.OrdinalIgnoreCase))
+        var trimmedInput = input.TrimStart();
+        if (!trimmedInput.StartsWith(command, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (trimmedInput.Length > command.Length && !char.IsWhiteSpace(trimmedInput[command.Length]))
             return false;
 
-        var args = input.TrimStart()[command.Length..]
+        var args = trimmedInput[command.Length..]
             .Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         foreach (var arg in args)
         {
@@ -139,10 +142,13 @@ public static class ModuleInstaller
             return false;
 
         const string command = "/new-module";
-        if (!input.TrimStart().StartsWith(command, StringComparison.OrdinalIgnoreCase))
+        var trimmedInput = input.TrimStart();
+        if (!trimmedInput.StartsWith(command, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (trimmedInput.Length > command.Length && !char.IsWhiteSpace(trimmedInput[command.Length]))
             return false;
 
-        var args = input.TrimStart()[command.Length..].Trim();
+        var args = trimmedInput[command.Length..].Trim();
         if (string.IsNullOrWhiteSpace(args))
             return false;
 
