@@ -339,6 +339,8 @@ builder.Services.AddSingleton<ICompassModule>(sp =>
     new SummarizationModule(sp.GetService<IModelClient>()));
 builder.Services.AddSingleton<ICompassModule>(sp =>
     new GmailModule(sp.GetService<IModelClient>()));
+builder.Services.AddSingleton<ICompassModule>(sp =>
+    new ShellCommandModule(sp.GetService<IModelClient>(), workingDirectory));
 
 // Register module router
 builder.Services.AddSingleton<ModuleRouter>(sp =>

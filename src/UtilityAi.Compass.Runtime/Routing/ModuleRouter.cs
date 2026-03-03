@@ -131,8 +131,9 @@ Available modules:
 CRITICAL ROUTING RULES:
 1. file-operations: ONLY for requests with EXPLICIT filenames (e.g., ""read notes.txt"", ""create file.json"")
    - DO NOT use for: weather, search, general questions, single-word inputs
-2. web-search: For weather, news, current events, real-time data, lookups
-3. conversation: Fallback for general questions, explanations, when no specialized module fits
+2. shell-command: For command-line/shell execution requests (e.g., ""run dotnet --version"", ""show git status"")
+3. web-search: For weather, news, current events, real-time data, lookups
+4. conversation: Fallback for general questions, explanations, when no specialized module fits
 
 Examples:
 - ""read notes.txt"" → file-operations (explicit filename)
@@ -140,6 +141,7 @@ Examples:
 - ""weather tomorrow"" → web-search (current data needed)
 - ""what is 2+2"" → conversation (general question)
 - ""create hello.txt"" → file-operations (explicit file creation)
+- ""run dotnet test"" → shell-command (explicit command request)
 
 Confidence scoring:
 - 0.9+: Perfect match (e.g., ""read file.txt"" → file-operations)

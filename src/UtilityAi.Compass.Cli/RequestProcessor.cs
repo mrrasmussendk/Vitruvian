@@ -59,6 +59,8 @@ internal sealed class RequestProcessor
             WebSearchModule _ => new WebSearchModule(contextAwareClient),
             SummarizationModule _ => new SummarizationModule(contextAwareClient),
             GmailModule _ => new GmailModule(contextAwareClient),
+            ShellCommandModule _ => new ShellCommandModule(contextAwareClient,
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "compass-workspace")),
             FileOperationsModule fileModule => new FileOperationsModule(contextAwareClient,
                 System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "compass-workspace")),
             _ => module // Return original if we don't know how to wrap it
