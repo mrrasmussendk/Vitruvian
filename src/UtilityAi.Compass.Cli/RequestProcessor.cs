@@ -2,30 +2,38 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using UtilityAi.Compass.Abstractions.Facts;
 using UtilityAi.Compass.Abstractions.Interfaces;
+using UtilityAi.Compass.Abstractions.Planning;
 using UtilityAi.Compass.Runtime;
+using UtilityAi.Compass.Runtime.Planning;
 using UtilityAi.Compass.Runtime.Routing;
 using UtilityAi.Compass.StandardModules;
 
 namespace UtilityAi.Compass.Cli;
 
 /// <summary>
-/// Simplified request processor using direct LLM-based module routing instead of UtilityAI orchestration.
+/// GOAP-style request processor that creates a plan before executing.
+/// Pipeline: Request → GoapPlanner → [HITL plan review] → PlanExecutor (parallel) → Memory + Cache → Response.
 /// </summary>
 internal sealed class RequestProcessor
 {
     private readonly IHost _host;
     private readonly ModuleRouter _router;
     private readonly IModelClient? _modelClient;
+    private readonly IApprovalGate? _approvalGate;
     private readonly Dictionary<string, ICompassModule> _modules = new();
     private readonly List<(string User, string Assistant)> _conversationHistory = new();
+    private readonly GoapPlanner _planner;
+    private PlanExecutor? _executor;
 
     private const int MaxConversationTurns = 10;
 
-    public RequestProcessor(IHost host, ModuleRouter router, IModelClient? modelClient)
+    public RequestProcessor(IHost host, ModuleRouter router, IModelClient? modelClient, IApprovalGate? approvalGate = null)
     {
         _host = host;
         _router = router;
         _modelClient = modelClient;
+        _approvalGate = approvalGate;
+        _planner = new GoapPlanner(modelClient);
     }
 
     public void RegisterModule(ICompassModule module)
@@ -34,6 +42,9 @@ internal sealed class RequestProcessor
 
         // Register with router (metadata is optional and defaults to 0.0 cost/risk)
         _router.RegisterModule(module, metadata: null);
+
+        // Register with planner so it knows available capabilities
+        _planner.RegisterModule(module.Domain, module.Description);
     }
 
     /// <summary>
@@ -69,78 +80,56 @@ internal sealed class RequestProcessor
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        // Check if this is a compound request
+        if (_modules.Count == 0 && _modelClient is null)
+        {
+            return "No model configured. Run 'compass --setup' or scripts/install.sh (Linux/macOS) / scripts/install.ps1 (Windows).";
+        }
+
+        // Phase 1: PLAN — create a GOAP-style plan before any execution
         var planStart = sw.ElapsedMilliseconds;
-        var requests = await CompoundRequestOrchestrator.PlanRequestsAsync(_modelClient, input, cancellationToken);
-        Console.WriteLine($"[PERF] PlanRequests: {sw.ElapsedMilliseconds - planStart}ms");
-
-        string responseText;
-        if (requests.Count > 1)
+        var plan = await _planner.CreatePlanAsync(BuildEnrichedInput(input), cancellationToken);
+        Console.WriteLine($"[GOAP] Plan created: {plan.PlanId} with {plan.Steps.Count} step(s)");
+        foreach (var step in plan.Steps)
         {
-            var allResponses = new List<string>();
-            foreach (var request in requests)
-            {
-                var response = await ExecuteSingleRequestAsync(request, null, cancellationToken);
-                allResponses.Add(response);
-            }
-            responseText = string.Join("\n\n", allResponses);
+            Console.WriteLine($"[GOAP]   {step.StepId}: {step.ModuleDomain} — {step.Description} (depends: [{string.Join(", ", step.DependsOn)}])");
         }
-        else
-        {
-            var execStart = sw.ElapsedMilliseconds;
-            responseText = await ExecuteSingleRequestAsync(input, null, cancellationToken);
-            Console.WriteLine($"[PERF] ExecuteSingleRequest: {sw.ElapsedMilliseconds - execStart}ms");
-        }
+        Console.WriteLine($"[PERF] Planning: {sw.ElapsedMilliseconds - planStart}ms");
 
-        var storeStart = sw.ElapsedMilliseconds;
-        await StoreConversationTurnAsync(input, responseText, cancellationToken);
-        Console.WriteLine($"[PERF] StoreConversation: {sw.ElapsedMilliseconds - storeStart}ms");
-        Console.WriteLine($"[PERF] Total: {sw.ElapsedMilliseconds}ms");
-
-        return responseText;
-    }
-
-    private async Task<string> ExecuteSingleRequestAsync(string input, string? userId, CancellationToken cancellationToken)
-    {
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-
-        // Build enriched input with conversation context for routing
-        var enrichedInput = BuildEnrichedInput(input);
-
-        // Route to the best module
-        var routeStart = sw.ElapsedMilliseconds;
-        var selectedDomain = await _router.SelectModuleAsync(enrichedInput, cancellationToken);
-        Console.WriteLine($"[PERF]   Router.SelectModule: {sw.ElapsedMilliseconds - routeStart}ms (selected: {selectedDomain ?? "none"})");
-
-        if (selectedDomain is null || !_modules.TryGetValue(selectedDomain, out var module))
+        // Phase 2: Handle steps with no module (fallback to direct LLM)
+        if (plan.Steps.Count == 1 && string.IsNullOrEmpty(plan.Steps[0].ModuleDomain))
         {
             if (_modelClient is null)
-            {
                 return "No model configured. Run 'compass --setup' or scripts/install.sh (Linux/macOS) / scripts/install.ps1 (Windows).";
-            }
 
-            // Fallback to direct LLM response
-            var llmStart = sw.ElapsedMilliseconds;
             var fallbackResponse = await _modelClient.GenerateAsync(input, cancellationToken);
-            Console.WriteLine($"[PERF]   Fallback LLM: {sw.ElapsedMilliseconds - llmStart}ms");
+            await StoreConversationTurnAsync(input, fallbackResponse, cancellationToken);
             return fallbackResponse;
         }
 
-        // Execute the selected module with CLEAN input
-        // Context is automatically provided via the context-aware model client wrapper
+        // Phase 3: EXECUTE — build context-aware module map and execute via PlanExecutor
+        var contextAwareModules = new Dictionary<string, ICompassModule>();
+        foreach (var step in plan.Steps)
+        {
+            if (!string.IsNullOrEmpty(step.ModuleDomain) && !contextAwareModules.ContainsKey(step.ModuleDomain))
+            {
+                contextAwareModules[step.ModuleDomain] = GetContextAwareModule(step.ModuleDomain);
+            }
+        }
+
+        _executor = new PlanExecutor(contextAwareModules, _approvalGate);
+
         var execStart = sw.ElapsedMilliseconds;
-        try
-        {
-            var contextAwareModule = GetContextAwareModule(selectedDomain);
-            var response = await contextAwareModule.ExecuteAsync(input, userId, cancellationToken);
-            Console.WriteLine($"[PERF]   Module.Execute ({selectedDomain}): {sw.ElapsedMilliseconds - execStart}ms");
-            return response;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[ROUTER] Module {selectedDomain} failed: {ex.Message}");
-            return $"Error executing {selectedDomain}: {ex.Message}";
-        }
+        var result = await _executor.ExecuteAsync(plan, null, cancellationToken);
+        Console.WriteLine($"[PERF] Execution: {sw.ElapsedMilliseconds - execStart}ms (parallel steps supported)");
+
+        // Phase 4: MEMORY — store conversation turn and log outcome
+        var storeStart = sw.ElapsedMilliseconds;
+        await StoreConversationTurnAsync(input, result.AggregatedOutput, cancellationToken);
+        Console.WriteLine($"[PERF] StoreConversation: {sw.ElapsedMilliseconds - storeStart}ms");
+        Console.WriteLine($"[GOAP] Plan {plan.PlanId} completed: success={result.Success}, memory_size={_executor.Memory.Count}");
+        Console.WriteLine($"[PERF] Total: {sw.ElapsedMilliseconds}ms");
+
+        return result.AggregatedOutput;
     }
 
     private Task StoreConversationTurnAsync(string input, string responseText, CancellationToken cancellationToken)
