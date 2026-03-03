@@ -9,6 +9,8 @@ namespace UtilityAi.Compass.StandardModules;
 /// </summary>
 public sealed class FileOperationsModule : ICompassModule
 {
+    private const string SkillResourceName = "UtilityAi.Compass.StandardModules.skill.md";
+    private static readonly string FileOperationSkill = LoadFileOperationSkill();
     private readonly IModelClient? _modelClient;
     private readonly string _workingDirectory;
     private const int MaxContentSizeBytes = 10 * 1024 * 1024; // 10MB limit
@@ -100,14 +102,8 @@ public sealed class FileOperationsModule : ICompassModule
 
         try
         {
-            var systemMessage = @"Determine the file operation type and extract parameters.
-Return ONLY valid JSON in this format: {""type"":""read""|""write"",""path"":""filename.ext"",""content"":""content if write, null if read""}
-- type: 'read' for reading/showing/outputting files, 'write' for creating/writing files
-- path: the exact filename mentioned
-- content: file content if writing, null if reading";
-
             var response = await _modelClient.CompleteAsync(
-                systemMessage: systemMessage,
+                systemMessage: FileOperationSkill,
                 userMessage: $"Analyze this file operation request: {requestText}",
                 cancellationToken: ct);
 
@@ -154,6 +150,16 @@ Return ONLY valid JSON in this format: {""type"":""read""|""write"",""path"":""f
         {
             return new FileOperation(FileOperationType.Read, string.Empty, null);
         }
+    }
+
+    private static string LoadFileOperationSkill()
+    {
+        using var stream = typeof(FileOperationsModule).Assembly.GetManifestResourceStream(SkillResourceName);
+        if (stream is null)
+            return "Determine the file operation type and extract parameters.";
+
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     private static string ExtractFilePath(string text)

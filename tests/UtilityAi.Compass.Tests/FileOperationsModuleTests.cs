@@ -9,6 +9,7 @@ public sealed class FileOperationsModuleTests
     private sealed class StubModelClient : IModelClient
     {
         private readonly string _response;
+        public string? LastSystemMessage { get; private set; }
 
         public StubModelClient(string response)
         {
@@ -22,7 +23,10 @@ public sealed class FileOperationsModuleTests
             => Task.FromResult(new ModelResponse { Text = _response });
 
         public Task<string> CompleteAsync(string systemMessage, string userMessage, IReadOnlyList<ModelTool>? tools = null, CancellationToken cancellationToken = default)
-            => Task.FromResult(_response);
+        {
+            LastSystemMessage = systemMessage;
+            return Task.FromResult(_response);
+        }
     }
 
     [Fact]
@@ -111,5 +115,25 @@ public sealed class FileOperationsModuleTests
         var result = await module.ExecuteAsync($"write to {absolutePath}", null, CancellationToken.None);
 
         Assert.Contains("Absolute paths not allowed", result);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UsesEmbeddedSkillPrompt_ForOperationDetection()
+    {
+        var modelClient = new StubModelClient("{\"type\":\"write\",\"path\":\"test.txt\",\"content\":\"hello\"}");
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+        var module = new FileOperationsModule(modelClient, workingDirectory: tempDir);
+
+        try
+        {
+            await module.ExecuteAsync("create test.txt with hello", null, CancellationToken.None);
+
+            Assert.Contains("FILE_OPERATIONS_SKILL_V1", modelClient.LastSystemMessage);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
     }
 }
