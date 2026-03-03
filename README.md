@@ -22,6 +22,7 @@ dotnet run --framework net8.0 --project src/UtilityAi.Compass.Cli
 - [Architecture](#architecture)
 - [CLI Usage](#cli-usage)
 - [Building Modules](#building-modules)
+- [Security & Permissions](#security--permissions)
 - [Working Directory](#working-directory)
 - [Configuration](#configuration)
 - [Repository Layout](#repository-layout)
@@ -134,6 +135,12 @@ Try some requests:
 ### 🗨️ **General Conversation**
 - Fallback module for general Q&A
 - Powered by your configured LLM
+
+### 🔒 **Security & Permissions**
+- Linux-style permission model (read/write/execute) with user/group/other tiers
+- Human-in-the-loop approval gate for write and destructive operations
+- Module sandboxing with configurable resource limits (CPU, memory, wall time)
+- Deny-by-default policy across all security layers
 
 ---
 
@@ -278,6 +285,71 @@ builder.Services.AddSingleton<ICompassModule>(sp =>
 
 ---
 
+## Security & Permissions
+
+Compass enforces a layered security model for all module execution. For the full reference, see [`docs/SECURITY.md`](docs/SECURITY.md).
+
+### Permission Model
+
+Modules declare required access using the `[RequiresPermission]` attribute. The runtime validates declarations against the active `IPermissionContext` before execution.
+
+```csharp
+using UtilityAi.Compass.Abstractions;
+using UtilityAi.Compass.PluginSdk.Attributes;
+
+[RequiresPermission(ModuleAccess.Read)]
+[RequiresPermission(ModuleAccess.Write, resource: "files/*")]
+public sealed class SecureFileModule : ICompassModule
+{
+    public string Domain => "secure-files";
+    public string Description => "Secure file operations with declared permissions";
+
+    public async Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
+    {
+        // Module implementation — runtime enforces permissions before this runs
+        return "done";
+    }
+}
+```
+
+Enforcement at runtime:
+
+```csharp
+var checker = new PermissionChecker(permissionContext);
+checker.Enforce(module, userId, group); // throws PermissionDeniedException if denied
+```
+
+### HITL Approval Gate
+
+Write and destructive operations require explicit human approval via `IApprovalGate`:
+
+```csharp
+IApprovalGate gate = new ConsoleApprovalGate(timeout: TimeSpan.FromSeconds(30));
+bool approved = await gate.ApproveAsync(
+    OperationType.Write, "Write config.json", module.Domain);
+```
+
+- **Default-deny**: unanswered prompts are automatically denied after timeout.
+- **Audit trail**: every decision is recorded as an `ApprovalRecord`.
+
+### Module Sandboxing
+
+Untrusted modules run inside `SandboxedModuleRunner` with enforced resource limits:
+
+```csharp
+var runner = new SandboxedModuleRunner(new DefaultSandboxPolicy
+{
+    MaxWallTime = TimeSpan.FromSeconds(10),
+    AllowFileSystem = true
+});
+
+string result = await runner.ExecuteAsync(module, request, userId);
+```
+
+Default sandbox limits: 30 s CPU, 256 MB memory, 60 s wall time, no file system / network / process access.
+
+---
+
 ## Working Directory
 
 ### Default Location
@@ -337,16 +409,21 @@ COMPASS_WORKING_DIRECTORY=/custom/path
 ```text
 UtilityAi.Compass.sln
 ├── src/
-│   ├── UtilityAi.Compass.Abstractions/     # Core interfaces and facts
-│   ├── UtilityAi.Compass.Runtime/          # Routing and orchestration
+│   ├── UtilityAi.Compass.Abstractions/     # Core interfaces, enums, and facts
+│   ├── UtilityAi.Compass.Runtime/          # Routing, orchestration, permission enforcement
 │   ├── UtilityAi.Compass.StandardModules/  # Built-in modules
-│   ├── UtilityAi.Compass.PluginSdk/        # SDK for module development
-│   ├── UtilityAi.Compass.PluginHost/       # Plugin loading infrastructure
-│   ├── UtilityAi.Compass.Hitl/             # Human-in-the-loop support
+│   ├── UtilityAi.Compass.PluginSdk/        # SDK attributes for module development
+│   ├── UtilityAi.Compass.PluginHost/       # Plugin loading, sandboxing, manifests
+│   ├── UtilityAi.Compass.Hitl/             # Human-in-the-loop approval gates
 │   ├── UtilityAi.Compass.WeatherModule/    # Example weather module
 │   └── UtilityAi.Compass.Cli/              # CLI application
-└── tests/
-    └── UtilityAi.Compass.Tests/            # Unit tests
+├── tests/
+│   └── UtilityAi.Compass.Tests/            # Unit tests
+└── docs/
+    ├── SECURITY.md                          # Security model reference
+    ├── EXTENDING.md                         # Plugin development guide
+    ├── GOVERNANCE.md                        # Governance pipeline
+    └── ...                                  # Additional documentation
 ```
 
 ---

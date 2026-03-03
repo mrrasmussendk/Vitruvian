@@ -20,7 +20,36 @@ Use SDK attributes so governance can route and score proposals:
 - `CompassCooldown`
 - `CompassConflicts`
 
-## 3) Build and install
+## 3) Declare permissions
+
+Modules that access files, write state, or execute processes must declare their
+required permissions using the `[RequiresPermission]` attribute. The runtime
+enforces these declarations before execution — undeclared access is denied.
+
+```csharp
+using UtilityAi.Compass.Abstractions;
+using UtilityAi.Compass.PluginSdk.Attributes;
+
+[RequiresPermission(ModuleAccess.Read)]
+[RequiresPermission(ModuleAccess.Write, resource: "files/*")]
+public sealed class MyFileModule : ICapabilityModule
+{
+    // ...
+}
+```
+
+Available access levels (combinable as flags):
+
+| Flag | Description |
+|------|-------------|
+| `ModuleAccess.Read` | Read files or resources |
+| `ModuleAccess.Write` | Create or modify files or resources |
+| `ModuleAccess.Execute` | Run commands or spawn processes |
+
+See [Security — Permission Model](SECURITY.md#permission-model) for the full
+enforcement model and runtime API.
+
+## 4) Build and install
 
 Build/publish the plugin and place outputs in a `plugins/` folder next to the host executable, or install via CLI:
 
@@ -28,8 +57,9 @@ Build/publish the plugin and place outputs in a `plugins/` folder next to the ho
 compass --install-module /absolute/path/MyPlugin.dll
 ```
 
-## 4) Example
+## 5) Example
 
 See:
 
-- Plugin example in the root [README.md](../README.md#step-by-step-build-your-first-capability-module)
+- Plugin example in the root [README.md](../README.md#building-modules)
+- Security model in [docs/SECURITY.md](SECURITY.md)
