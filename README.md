@@ -64,7 +64,7 @@ dotnet run --framework net8.0 --project src/UtilityAi.Compass.Cli
 git clone https://github.com/mrrasmussendk/Compass.git
 cd Compass
 dotnet build
-dotnet test   # 68 tests should pass
+dotnet test   # All tests should pass
 ```
 
 ### Configure your model provider
