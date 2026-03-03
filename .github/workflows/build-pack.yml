@@ -124,7 +124,19 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && (inputs.bump_and_publish == true || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: dotnet nuget push artifacts/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::error::NUGET_API_KEY secret is not set or is empty. Configure it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          NUGET_API_KEY="$(printf '%s' "$NUGET_API_KEY" | tr -d '[:space:]')"
+          for pkg in artifacts/*.nupkg; do
+            echo "Pushing $pkg ..."
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
 
       - name: Upload NuGet artifact
         uses: actions/upload-artifact@v4
