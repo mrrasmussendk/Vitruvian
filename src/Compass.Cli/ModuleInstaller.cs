@@ -217,8 +217,8 @@ public static class ModuleInstaller
 
               <ItemGroup>
                 <PackageReference Include="UtilityAi" Version="1.6.5" />
-                <PackageReference Include="Vitruvian.Abstractions" Version="*" />
-                <PackageReference Include="Vitruvian.PluginSdk" Version="*" />
+                <PackageReference Include="Vitruvian.Abstractions" Version="0.*" />
+                <PackageReference Include="Vitruvian.PluginSdk" Version="0.*" />
               </ItemGroup>
 
               <ItemGroup>
@@ -716,7 +716,7 @@ public static class ModuleInstaller
         if (!File.Exists(manifestPath))
         {
             manifest = null;
-            error = $"Module install failed: missing required manifest '{ManifestFileName}' (or legacy '{LegacyManifestFileName}').";
+            error = $"Module install failed: missing required manifest (expected '{ManifestFileName}' or '{LegacyManifestFileName}').";
             return false;
         }
 
@@ -757,7 +757,7 @@ public static class ModuleInstaller
         if (entry is null)
         {
             manifest = null;
-            error = $"Module install failed: package is missing required manifest '{ManifestFileName}' (or legacy '{LegacyManifestFileName}').";
+            error = $"Module install failed: package is missing required manifest (expected '{ManifestFileName}' or '{LegacyManifestFileName}').";
             return false;
         }
 

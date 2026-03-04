@@ -66,8 +66,8 @@ public sealed class ModuleInstallerTests
             Assert.True(File.Exists(readmePath));
 
             var projectContents = File.ReadAllText(projectPath);
-            Assert.Contains("<PackageReference Include=\"Vitruvian.Abstractions\" Version=\"*\" />", projectContents);
-            Assert.Contains("<PackageReference Include=\"Vitruvian.PluginSdk\" Version=\"*\" />", projectContents);
+            Assert.Contains("<PackageReference Include=\"Vitruvian.Abstractions\" Version=\"0.*\" />", projectContents);
+            Assert.Contains("<PackageReference Include=\"Vitruvian.PluginSdk\" Version=\"0.*\" />", projectContents);
 
             var readmeContents = File.ReadAllText(readmePath);
             Assert.Contains("vitruvian-manifest.json", readmeContents);
