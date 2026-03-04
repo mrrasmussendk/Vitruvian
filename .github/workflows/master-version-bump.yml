@@ -26,6 +26,8 @@ jobs:
           from pathlib import Path
 
           projects = [
+              Path("src/Compass.Abstractions/Vitruvian.Abstractions.csproj"),
+              Path("src/Compass.PluginSdk/Vitruvian.PluginSdk.csproj"),
               Path("src/Compass.Cli/Vitruvian.Cli.csproj"),
               Path("src/Compass.WeatherModule/Vitruvian.WeatherModule.csproj"),
           ]
@@ -79,6 +81,6 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/Compass.Cli/Vitruvian.Cli.csproj src/Compass.WeatherModule/Vitruvian.WeatherModule.csproj
+          git add src/Compass.Abstractions/Vitruvian.Abstractions.csproj src/Compass.PluginSdk/Vitruvian.PluginSdk.csproj src/Compass.Cli/Vitruvian.Cli.csproj src/Compass.WeatherModule/Vitruvian.WeatherModule.csproj
           git commit -m "chore: bump package versions"
           git push
