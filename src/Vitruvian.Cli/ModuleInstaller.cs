@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
 using System.Text.Json;
+using VitruvianPluginSdk.Attributes;
 
 namespace VitruvianCli;
 
@@ -410,16 +411,22 @@ public static class ModuleInstaller
             "SideEffectLevel": "medium"
             ```
 
-            ### Adding Secrets
+             ### Adding Secrets
 
-            If your module needs API keys or credentials:
+             If your module needs API keys or credentials:
 
-            1. Add to `vitruvian-manifest.json`:
-               ```json
-               "RequiredSecrets": ["MY_API_KEY"]
-               ```
+             1. Add one or more attributes to your module class:
+                ```csharp
+                [RequiresApiKey("MY_API_KEY")]
+                [RequiresApiKey("MY_SECOND_API_KEY")]
+                ```
 
-            2. Users will be prompted during installation to provide the secret.
+             2. Optionally document the same keys in `vitruvian-manifest.json`:
+                ```json
+                "RequiredSecrets": ["MY_API_KEY"]
+                ```
+
+             3. Users will be prompted during installation to provide any missing keys.
 
             ## Testing
 
@@ -483,7 +490,8 @@ public static class ModuleInstaller
                 return ModuleInstallResult.FromFailure($"Module install failed: could not resolve directory for '{Path.GetFileName(filePath)}'.");
             if (!TryLoadManifest(fileDirectory, out var manifest, out var manifestError))
                 return ModuleInstallResult.FromFailure(manifestError);
-            if (manifest is not null && !TryResolveRequiredSecrets(manifest, secretPrompt, out var secretError))
+            var requiredSecrets = GetRequiredSecrets(filePath, manifest);
+            if (!TryResolveRequiredSecrets(requiredSecrets, secretPrompt, out var secretError))
                 return ModuleInstallResult.FromFailure(secretError);
             if (!allowUnsigned && !IsSignedAssembly(filePath))
                 return ModuleInstallResult.FromFailure($"Module install failed: '{Path.GetFileName(filePath)}' is unsigned. Re-run with --allow-unsigned to override.");
@@ -504,8 +512,6 @@ public static class ModuleInstaller
         using var archive = ZipFile.OpenRead(nupkgPath);
         if (!TryLoadManifest(archive, out var manifest, out var manifestError))
             return ModuleInstallResult.FromFailure(manifestError);
-        if (manifest is not null && !TryResolveRequiredSecrets(manifest, secretPrompt, out var secretError))
-            return ModuleInstallResult.FromFailure(secretError);
         var copiedFiles = new List<string>();
         var hasUtilityAiModule = false;
 
@@ -546,15 +552,23 @@ public static class ModuleInstaller
             return ModuleInstallResult.FromFailure($"Module install failed: package '{packageId ?? Path.GetFileName(nupkgPath)}' does not contain a compatible UtilityAI module assembly.");
         }
 
+        var requiredSecrets = GetRequiredSecrets(copiedFiles, manifest);
+        if (!TryResolveRequiredSecrets(requiredSecrets, secretPrompt, out var secretError))
+        {
+            foreach (var file in copiedFiles.Where(File.Exists))
+                File.Delete(file);
+            return ModuleInstallResult.FromFailure(secretError);
+        }
+
         return ModuleInstallResult.FromSuccess($"Installed {copiedFiles.Count} module assembly file(s) from '{packageId ?? Path.GetFileName(nupkgPath)}'.");
     }
 
     private static bool TryResolveRequiredSecrets(
-        ModulePermissionManifest manifest,
+        IReadOnlyList<string> requiredSecrets,
         Func<string, string?>? secretPrompt,
         out string error)
     {
-        foreach (var secretName in manifest.RequiredSecrets ?? [])
+        foreach (var secretName in requiredSecrets)
         {
             if (string.IsNullOrWhiteSpace(secretName))
                 continue;
@@ -581,6 +595,72 @@ public static class ModuleInstaller
         error = string.Empty;
         return true;
     }
+
+    private static IReadOnlyList<string> GetRequiredSecrets(string assemblyPath, ModulePermissionManifest? manifest)
+    {
+        var requiredSecrets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddManifestSecrets(requiredSecrets, manifest);
+        AddAssemblySecrets(requiredSecrets, assemblyPath);
+        return requiredSecrets.ToArray();
+    }
+
+    private static IReadOnlyList<string> GetRequiredSecrets(IEnumerable<string> assemblyPaths, ModulePermissionManifest? manifest)
+    {
+        var requiredSecrets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddManifestSecrets(requiredSecrets, manifest);
+        foreach (var assemblyPath in assemblyPaths)
+            AddAssemblySecrets(requiredSecrets, assemblyPath);
+        return requiredSecrets.ToArray();
+    }
+
+    private static void AddManifestSecrets(HashSet<string> requiredSecrets, ModulePermissionManifest? manifest)
+    {
+        foreach (var secretName in manifest?.RequiredSecrets ?? [])
+        {
+            if (!string.IsNullOrWhiteSpace(secretName))
+                requiredSecrets.Add(secretName.Trim());
+        }
+    }
+
+    private static void AddAssemblySecrets(HashSet<string> requiredSecrets, string assemblyPath)
+    {
+        foreach (var secretName in GetRequiredApiKeysFromAssembly(assemblyPath))
+            requiredSecrets.Add(secretName);
+    }
+
+    private static IReadOnlyList<string> GetRequiredApiKeysFromAssembly(string assemblyPath)
+    {
+        var loadContext = new AssemblyLoadContext($"VitruvianModuleSecrets.{Guid.NewGuid():N}", isCollectible: true);
+        try
+        {
+            var bytes = File.ReadAllBytes(assemblyPath);
+            using var ms = new MemoryStream(bytes);
+            var assembly = loadContext.LoadFromStream(ms);
+            return GetRequiredApiKeysFromTypes(assembly.GetExportedTypes());
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            return GetRequiredApiKeysFromTypes(ex.Types.OfType<Type>());
+        }
+        catch
+        {
+            return [];
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    private static IReadOnlyList<string> GetRequiredApiKeysFromTypes(IEnumerable<Type> types)
+        => types
+            .Where(IsUtilityAiModuleType)
+            .SelectMany(static type => type.GetCustomAttributes<RequiresApiKeyAttribute>(inherit: true))
+            .Select(static attr => attr.EnvironmentVariable?.Trim())
+            .Where(static envVar => !string.IsNullOrWhiteSpace(envVar))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Cast<string>()
+            .ToArray();
 
     private static bool IsPluginAssemblyEntry(ZipArchiveEntry entry)
     {

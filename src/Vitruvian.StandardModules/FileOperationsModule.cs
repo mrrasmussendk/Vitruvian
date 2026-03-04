@@ -1,6 +1,7 @@
 using System.Text.Json;
 using VitruvianAbstractions;
 using VitruvianAbstractions.Interfaces;
+using VitruvianPluginSdk;
 using VitruvianPluginSdk.Attributes;
 
 namespace VitruvianStandardModules;
@@ -13,6 +14,7 @@ namespace VitruvianStandardModules;
 [RequiresPermission(ModuleAccess.Write)]
 public sealed class FileOperationsModule : IVitruvianModule
 {
+    private const string SkillFileName = "skill.md";
     private const string SkillResourceName = "VitruvianStandardModules.skill.md";
     private const string DefaultFileOperationSkill = """
 Determine the file operation type and extract parameters.
@@ -21,7 +23,10 @@ Return ONLY valid JSON in this format: {"type":"read"|"write","path":"filename.e
 - path: the exact filename mentioned
 - content: file content if writing, null if reading
 """;
-    private static readonly string FileOperationSkill = LoadFileOperationSkill();
+    private static readonly string FileOperationSkill = ModuleSkillLoader.LoadMarkdownSkill(
+        typeof(FileOperationsModule),
+        SkillFileName,
+        LoadEmbeddedFileOperationSkill());
     private readonly IModelClient? _modelClient;
     private readonly string _workingDirectory;
     private const int MaxContentSizeBytes = 10 * 1024 * 1024; // 10MB limit
@@ -163,7 +168,7 @@ Return ONLY valid JSON in this format: {"type":"read"|"write","path":"filename.e
         }
     }
 
-    private static string LoadFileOperationSkill()
+    private static string LoadEmbeddedFileOperationSkill()
     {
         using var stream = typeof(FileOperationsModule).Assembly.GetManifestResourceStream(SkillResourceName);
         if (stream is null)
