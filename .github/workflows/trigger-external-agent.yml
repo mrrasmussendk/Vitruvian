@@ -1,0 +1,41 @@
+name: trigger-external-agent
+
+on:
+  workflow_run:
+    workflows: ["build-pack"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch-agent:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && vars.AGENT_REPOSITORY != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger external agent repository
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.AGENT_REPO_TOKEN }}
+          script: |
+            const [owner, repo] = process.env.TARGET_REPOSITORY.split('/');
+            if (!owner || !repo) {
+              core.setFailed('AGENT_REPOSITORY must be in the format "owner/repo".');
+              return;
+            }
+
+            await github.request('POST /repos/{owner}/{repo}/dispatches', {
+              owner,
+              repo,
+              event_type: process.env.EVENT_TYPE || 'compass-build-completed',
+              client_payload: {
+                source_repository: `${context.repo.owner}/${context.repo.repo}`,
+                source_workflow_run_id: context.payload.workflow_run.id,
+                source_sha: context.payload.workflow_run.head_sha,
+                source_branch: context.payload.workflow_run.head_branch,
+                source_conclusion: context.payload.workflow_run.conclusion
+              }
+            });
+        env:
+          TARGET_REPOSITORY: ${{ vars.AGENT_REPOSITORY }}
+          EVENT_TYPE: ${{ vars.AGENT_EVENT_TYPE }}

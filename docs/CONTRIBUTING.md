@@ -25,6 +25,16 @@ dotnet test UtilityAi.Vitruvian.sln
 - Add or update tests in `tests/UtilityAi.Vitruvian.Tests`
 - Run targeted tests for changed areas, then full solution tests
 
+## Cross-repository agent trigger pipeline
+
+`build-pack` now triggers `trigger-external-agent` after a successful run.
+
+To enable dispatching to your own repository:
+
+- Set repository variable `AGENT_REPOSITORY` to `owner/repo`
+- (Optional) Set repository variable `AGENT_EVENT_TYPE` (defaults to `compass-build-completed`)
+- Add secret `AGENT_REPO_TOKEN` with permission to dispatch events to that repository
+
 ## Contribution focus areas
 
 - Governance behavior in `VitruvianGovernedSelectionStrategy`
