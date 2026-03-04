@@ -27,6 +27,30 @@ public sealed class InstalledModuleLoaderTests
 
         Assert.Empty(modules);
     }
+
+    [Fact]
+    public void LoadFromPluginsPath_WithPluginAssembly_LoadsModule()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var pluginsPath = Path.Combine(Path.GetTempPath(), $"vitruvian-plugins-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(pluginsPath);
+
+        try
+        {
+            var sourceAssemblyPath = typeof(InstalledModuleLoaderTestModule).Assembly.Location;
+            var destinationAssemblyPath = Path.Combine(pluginsPath, "InstalledModuleLoaderTestPlugin.dll");
+            File.Copy(sourceAssemblyPath, destinationAssemblyPath, overwrite: true);
+
+            var modules = InstalledModuleLoader.LoadFromPluginsPath(pluginsPath, provider);
+
+            Assert.Contains(modules, static module => module.GetType() == typeof(InstalledModuleLoaderTestModule));
+        }
+        finally
+        {
+            if (Directory.Exists(pluginsPath))
+                Directory.Delete(pluginsPath, recursive: true);
+        }
+    }
 }
 
 public sealed class InstalledModuleLoaderTestModule : IVitruvianModule

@@ -19,9 +19,9 @@ public static class InstalledModuleLoader
                 var assembly = Assembly.LoadFrom(dllPath);
                 modules.AddRange(CreateModulesFromAssembly(assembly, services));
             }
-            catch
+            catch (Exception ex)
             {
-                // Skip invalid plugin assemblies and continue loading remaining modules.
+                Console.WriteLine($"[WARN] Failed to load plugin assembly '{dllPath}': {ex.Message}");
             }
         }
 
@@ -41,9 +41,9 @@ public static class InstalledModuleLoader
                 if (ActivatorUtilities.CreateInstance(services, moduleType) is IVitruvianModule module)
                     modules.Add(module);
             }
-            catch
+            catch (Exception ex)
             {
-                // Skip plugin types that cannot be activated by DI.
+                Console.WriteLine($"[WARN] Failed to activate module type '{moduleType.FullName}': {ex.Message}");
             }
         }
 
