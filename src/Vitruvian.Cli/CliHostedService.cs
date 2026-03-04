@@ -128,7 +128,7 @@ public sealed class CliHostedService : BackgroundService
 
     /// <summary>
     /// Parses `/schedule "every 5 minutes" do something` into schedule description and task request.
-    /// Format: /schedule "&lt;interval&gt;" &lt;request text&gt;
+    /// Format: /schedule "<interval>" <request text>
     /// </summary>
     internal static bool TryParseScheduleCommand(string input, out string scheduleDescription, out string taskRequest)
     {

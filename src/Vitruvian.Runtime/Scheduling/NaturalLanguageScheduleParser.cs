@@ -4,7 +4,7 @@ using VitruvianAbstractions.Interfaces;
 namespace VitruvianRuntime.Scheduling;
 
 /// <summary>
-/// Parses plain-text schedule descriptions (e.g. "every 5 minutes", "daily at 9am")
+/// Parses plain-text schedule descriptions (e.g. "every 5 minutes", "hourly", "daily")
 /// into a <see cref="TimeSpan"/> repeat interval.
 /// Uses local regex heuristics first and falls back to the LLM when available.
 /// </summary>
