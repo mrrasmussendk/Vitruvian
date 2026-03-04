@@ -1,55 +1,112 @@
-# Using UtilityAi.Vitruvian
+# Using Vitruvian
 
-This guide is for running Vitruvian as a host application.
+This guide covers day-to-day usage of Vitruvian as an AI assistant.
 
-## 1) Install and configure
+---
+
+## 1. Install and Configure
 
 Follow [INSTALL.md](INSTALL.md) for prerequisites, build/test, and provider setup.
 
-## 2) Run the main host
+---
+
+## 2. Run the CLI
 
 ```bash
-dotnet run --framework net10.0 --project src/UtilityAi.Vitruvian.Cli
+dotnet run --project src/Vitruvian.Cli
 ```
 
-## 3) Understand runtime behavior
+You will see an interactive prompt:
+
+```
+Vitruvian CLI started. Type a request (or 'quit' to exit):
+>
+```
+
+---
+
+## 3. Making Requests
+
+Type natural language requests at the prompt:
+
+```
+> What is the weather tomorrow?
+> Read the file notes.txt
+> Create a file called todo.txt with content "Buy milk"
+```
+
+### How requests are processed
 
 For each request, Vitruvian:
 
-1. Uses sensors to classify intent (`GoalTag`) and routing (`Lane`)
-2. Collects proposals from built-in and plugin modules
-3. Applies governed selection (conflicts, cooldowns, cost/risk, hysteresis)
-4. Executes the winning proposal
+1. **Plans** — the `GoapPlanner` decomposes the request into an `ExecutionPlan` of `PlanStep` nodes with dependency edges.
+2. **Executes** — the `PlanExecutor` runs steps in dependency waves. Independent steps run in parallel. Each step goes through cache check → HITL approval (for writes) → context injection → module execution → cache store.
+3. **Remembers** — the plan result and conversation turn are stored in memory for future context.
 
-## 4) Use CLI tooling (optional)
+For more on the internals, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Run the CLI:
+---
 
-```bash
-dotnet run --framework net10.0 --project src/UtilityAi.Vitruvian.Cli
+## 4. CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/setup` | Run guided setup |
+| `/list-modules` | List all registered modules |
+| `/install-module <path>` | Install a plugin module from a DLL path |
+| `/new-module <Name>` | Scaffold a new module project |
+| `quit` | Exit the CLI |
+
+---
+
+## 5. Conversation Context
+
+Vitruvian maintains in-memory conversation history (last 10 turns), so follow-up messages are understood in context:
+
+```
+> What is the weather tomorrow?
+Assistant: I need your location. What city are you in?
+
+> Copenhagen
+Assistant: [Provides Copenhagen weather forecast]
 ```
 
-Common commands:
+---
 
-```bash
-Vitruvian --setup
-Vitruvian --list-modules
-Vitruvian --install-module /absolute/path/MyPlugin.dll
+## 6. Compound Requests
+
+Vitruvian handles multi-intent messages automatically when a model client is configured. You can combine multiple independent tasks in a single sentence:
+
+```
+> Create file u.txt with gold then give me the colors of the rainbow
+> Write hello to greeting.txt and then summarize today's news
 ```
 
-If a plugin manifest includes `requiredSecrets`, Vitruvian prompts for missing values during interactive install and fails installation when a required value is not supplied.
+Each sub-task is routed through the full pipeline, so the right module handles each part — no module needs special compound-request awareness. See [COMPOUND-REQUESTS.md](COMPOUND-REQUESTS.md) for details.
 
-Example Gmail prompts you can try in the main host:
+---
 
-- `read my gmail inbox for unread messages`
-- `draft a reply to the latest gmail message`
+## 7. HITL Approval
 
-## 5) Compound requests
+Write, delete, and execute operations are gated through human approval. When a module requests a side-effecting action, you will see a prompt:
 
-Vitruvian handles compound requests automatically when a model client is configured. You can combine multiple independent tasks in a single message:
+```
+[APPROVAL REQUIRED] Module 'file-operations' wants to perform: Write
+  Description: Create file todo.txt
+  Approve? (y/n):
+```
 
-- `create file u.txt with gold then give me the colors of the rainbow`
-- `write hello to greeting.txt and then summarize today's news`
-- `send an SMS with the weather forecast then create a log entry`
+Type `y` to approve or `n` to deny. If you do not respond within the timeout (default: 30 seconds), the operation is denied automatically.
 
-Each sub-task is routed through the full pipeline, so the right module handles each part — no module needs special compound-request awareness. See [COMPOUND-REQUESTS.md](COMPOUND-REQUESTS.md) for architecture details.
+---
+
+## 8. Plugin Installation
+
+Install a plugin module interactively:
+
+```
+> /install-module /absolute/path/MyPlugin.dll
+```
+
+If a plugin manifest includes `requiredSecrets`, Vitruvian prompts for missing values during interactive install. See [EXTENDING.md](EXTENDING.md) for how to build plugins.

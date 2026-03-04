@@ -32,10 +32,10 @@ The `ModuleAccess` flags enum defines three permission levels that can be combin
 
 ### Declaring Permissions
 
-Modules declare required permissions using the `[RequiresPermission]` attribute from `UtilityAi.Vitruvian.PluginSdk`:
+Modules declare required permissions using the `[RequiresPermission]` attribute from `Vitruvian.PluginSdk`:
 
 ```csharp
-using UtilityAi.Vitruvian.PluginSdk.Attributes;
+using VitruvianPluginSdk.Attributes;
 
 [RequiresPermission(ModuleAccess.Read)]
 [RequiresPermission(ModuleAccess.Write, resource: "files/*")]
@@ -46,7 +46,7 @@ The attribute supports an optional `resource` parameter for scoping permissions 
 
 ### Runtime Enforcement
 
-`PermissionChecker` (in `UtilityAi.Vitruvian.Runtime`) reads the `[RequiresPermission]` attributes from the module type and validates them against the current `IPermissionContext`:
+`PermissionChecker` (in `Vitruvian.Runtime`) reads the `[RequiresPermission]` attributes from the module type and validates them against the current `IPermissionContext`:
 
 ```csharp
 var checker = new PermissionChecker(permissionContext);
@@ -110,7 +110,7 @@ Module requests operation
 
 ### Console Implementation
 
-`ConsoleApprovalGate` (in `UtilityAi.Vitruvian.Hitl`) provides a CLI-based approval prompt:
+`ConsoleApprovalGate` (in `Vitruvian.Hitl`) provides a CLI-based approval prompt:
 
 ```csharp
 IApprovalGate gate = new ConsoleApprovalGate(
@@ -169,7 +169,7 @@ The `ISandboxPolicy` interface defines the constraints for sandboxed execution:
 
 ### Sandboxed Execution
 
-`SandboxedModuleRunner` (in `UtilityAi.Vitruvian.PluginHost`) enforces the sandbox policy during module execution:
+`SandboxedModuleRunner` (in `Vitruvian.PluginHost`) enforces the sandbox policy during module execution:
 
 ```csharp
 var policy = new DefaultSandboxPolicy
@@ -234,7 +234,7 @@ Optional fields:
 - **`.dll` install**: Must contain a UtilityAI module type, manifest must exist alongside the DLL, required secrets must be set or entered at the install prompt, and the assembly must be signed unless `--allow-unsigned` is passed.
 - **`.nupkg` install**: Must contain compatible assemblies, the package root must contain `Vitruvian-manifest.json`, and the same signing and secrets requirements apply.
 
-Secrets entered at the install prompt are persisted to the `.env.Vitruvian` file so they are available on subsequent runs. See [Extending — Declare required API keys](EXTENDING.md#4-declare-required-api-keys) for details on how modules declare and consume API keys.
+Secrets entered at the install prompt are persisted to the `.env.Vitruvian` file so they are available on subsequent runs. See [Extending — Declare required API keys](EXTENDING.md#5-declare-required-api-keys) for details on how modules declare and consume API keys.
 
 ---
 
