@@ -10,7 +10,8 @@ namespace VitruvianCli;
 public static class ModuleInstaller
 {
     private static readonly HttpClient _httpClient = new();
-    private const string ManifestFileName = "compass-manifest.json";
+    private const string ManifestFileName = "vitruvian-manifest.json";
+    private const string LegacyManifestFileName = "compass-manifest.json";
 
     public sealed record ModuleInstallResult(bool Success, string Message)
     {
@@ -202,7 +203,7 @@ public static class ModuleInstaller
         var readmePath = Path.Combine(moduleDirectory, "README.md");
 
         File.WriteAllText(projectPath,
-            """
+            $$"""
             <Project Sdk="Microsoft.NET.Sdk">
 
               <PropertyGroup>
@@ -216,10 +217,12 @@ public static class ModuleInstaller
 
               <ItemGroup>
                 <PackageReference Include="UtilityAi" Version="1.6.5" />
+                <PackageReference Include="Vitruvian.Abstractions" Version="0.*" />
+                <PackageReference Include="Vitruvian.PluginSdk" Version="0.*" />
               </ItemGroup>
 
               <ItemGroup>
-                <None Include="compass-manifest.json" CopyToOutputDirectory="PreserveNewest" />
+                <None Include="{{ManifestFileName}}" CopyToOutputDirectory="PreserveNewest" />
               </ItemGroup>
 
             </Project>
@@ -347,7 +350,7 @@ public static class ModuleInstaller
 
             # Copy DLL and manifest to Vitruvian plugins directory
             cp bin/Debug/net10.0/{{moduleName}}.dll /path/to/vitruvian/plugins/
-            cp compass-manifest.json /path/to/vitruvian/plugins/
+            cp vitruvian-manifest.json /path/to/vitruvian/plugins/
             ```
 
             ## Deployment
@@ -387,7 +390,7 @@ public static class ModuleInstaller
 
             1. **Update `Description`** in `{{className}}.cs` to accurately describe what your module does
             2. **Implement `ExecuteAsync`** with your actual module logic
-            3. **Update `compass-manifest.json`**:
+            3. **Update `vitruvian-manifest.json`**:
                - Set your publisher name
                - Update permissions to match what your module needs
                - Set `SideEffectLevel` (`readonly`, `low`, `medium`, `high`)
@@ -400,7 +403,7 @@ public static class ModuleInstaller
             [RequiresPermission(ModuleAccess.Read | ModuleAccess.Write)]
             ```
 
-            And update `compass-manifest.json`:
+            And update `vitruvian-manifest.json`:
 
             ```json
             "Permissions": ["read", "write"],
@@ -411,7 +414,7 @@ public static class ModuleInstaller
 
             If your module needs API keys or credentials:
 
-            1. Add to `compass-manifest.json`:
+            1. Add to `vitruvian-manifest.json`:
                ```json
                "RequiredSecrets": ["MY_API_KEY"]
                ```
@@ -709,11 +712,11 @@ public static class ModuleInstaller
 
     private static bool TryLoadManifest(string directoryPath, out ModulePermissionManifest? manifest, out string error)
     {
-        var manifestPath = Path.Combine(directoryPath, ManifestFileName);
+        var manifestPath = GetManifestPath(directoryPath);
         if (!File.Exists(manifestPath))
         {
             manifest = null;
-            error = $"Module install failed: missing required manifest '{ManifestFileName}'.";
+            error = $"Module install failed: missing required manifest (expected '{ManifestFileName}' or '{LegacyManifestFileName}').";
             return false;
         }
 
@@ -749,11 +752,12 @@ public static class ModuleInstaller
     private static bool TryLoadManifest(ZipArchive archive, out ModulePermissionManifest? manifest, out string error)
     {
         var entry = archive.Entries.FirstOrDefault(e =>
-            e.FullName.Equals(ManifestFileName, StringComparison.OrdinalIgnoreCase));
+            e.FullName.Equals(ManifestFileName, StringComparison.OrdinalIgnoreCase)
+            || e.FullName.Equals(LegacyManifestFileName, StringComparison.OrdinalIgnoreCase));
         if (entry is null)
         {
             manifest = null;
-            error = $"Module install failed: package is missing required manifest '{ManifestFileName}'.";
+            error = $"Module install failed: package is missing required manifest (expected '{ManifestFileName}' or '{LegacyManifestFileName}').";
             return false;
         }
 
@@ -787,6 +791,15 @@ public static class ModuleInstaller
     }
 
     private static readonly JsonSerializerOptions JsonDefaults = new(JsonSerializerDefaults.Web);
+
+    private static string GetManifestPath(string directoryPath)
+    {
+        var vitruvianManifestPath = Path.Combine(directoryPath, ManifestFileName);
+        if (File.Exists(vitruvianManifestPath))
+            return vitruvianManifestPath;
+
+        return Path.Combine(directoryPath, LegacyManifestFileName);
+    }
 
     private static async Task<ModuleInspectionReport> InspectFileAsync(string filePath, CancellationToken cancellationToken, string? displayName = null)
     {

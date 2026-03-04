@@ -44,4 +44,39 @@ public sealed class ModuleInstallerTests
         Assert.Equal(string.Empty, moduleName);
         Assert.Equal(Directory.GetCurrentDirectory(), outputPath);
     }
+
+    [Fact]
+    public void ScaffoldNewModule_GeneratesVitruvianManifestAndSdkReferences()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"vitruvian-scaffold-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var moduleName = "ExampleModule";
+            var scaffoldMessage = ModuleInstaller.ScaffoldNewModule(moduleName, tempRoot);
+            var moduleDirectory = Path.Combine(tempRoot, moduleName);
+            var projectPath = Path.Combine(moduleDirectory, $"{moduleName}.csproj");
+            var manifestPath = Path.Combine(moduleDirectory, "vitruvian-manifest.json");
+            var readmePath = Path.Combine(moduleDirectory, "README.md");
+
+            Assert.Contains("Created module scaffold", scaffoldMessage);
+            Assert.True(File.Exists(projectPath));
+            Assert.True(File.Exists(manifestPath));
+            Assert.True(File.Exists(readmePath));
+
+            var projectContents = File.ReadAllText(projectPath);
+            Assert.Contains("<PackageReference Include=\"Vitruvian.Abstractions\" Version=\"0.*\" />", projectContents);
+            Assert.Contains("<PackageReference Include=\"Vitruvian.PluginSdk\" Version=\"0.*\" />", projectContents);
+
+            var readmeContents = File.ReadAllText(readmePath);
+            Assert.Contains("vitruvian-manifest.json", readmeContents);
+            Assert.DoesNotContain("compass-manifest.json", readmeContents);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
 }
