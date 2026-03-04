@@ -34,6 +34,16 @@ public sealed class ModuleRouter
     }
 
     /// <summary>
+    /// Unregisters a module by its domain name so it is no longer considered for routing.
+    /// </summary>
+    /// <param name="domain">The domain identifier of the module to remove.</param>
+    /// <returns><c>true</c> if a module was found and removed; otherwise <c>false</c>.</returns>
+    public bool UnregisterModule(string domain)
+    {
+        return _modules.RemoveAll(m => m.Domain == domain) > 0;
+    }
+
+    /// <summary>
     /// Selects the most appropriate module for the given request using LLM reasoning.
     /// Falls back to simple matching if no model client is available.
     /// </summary>

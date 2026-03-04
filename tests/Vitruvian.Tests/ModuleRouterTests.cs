@@ -149,4 +149,54 @@ public sealed class ModuleRouterTests
 
         Assert.Equal("sms", result);
     }
+
+    [Fact]
+    public void UnregisterModule_WithExistingDomain_ReturnsTrueAndRemovesModule()
+    {
+        var router = new ModuleRouter();
+        var module = new TestModule("test-module", "A test module");
+        router.RegisterModule(module);
+
+        var removed = router.UnregisterModule("test-module");
+
+        Assert.True(removed);
+    }
+
+    [Fact]
+    public void UnregisterModule_WithNonExistentDomain_ReturnsFalse()
+    {
+        var router = new ModuleRouter();
+
+        var removed = router.UnregisterModule("does-not-exist");
+
+        Assert.False(removed);
+    }
+
+    [Fact]
+    public async Task UnregisterModule_RemovedModuleIsNoLongerRouted()
+    {
+        var router = new ModuleRouter();
+        var fileModule = new TestModule("file-operations", "Read or write files on the local filesystem");
+        var conversationModule = new TestModule("conversation", "Answer general questions using conversational AI");
+        router.RegisterModule(fileModule);
+        router.RegisterModule(conversationModule);
+
+        router.UnregisterModule("file-operations");
+
+        var result = await router.SelectModuleAsync("read colors.txt", CancellationToken.None);
+        Assert.Equal("conversation", result);
+    }
+
+    [Fact]
+    public async Task UnregisterModule_AllModulesRemoved_ReturnsNull()
+    {
+        var router = new ModuleRouter();
+        var module = new TestModule("only-module", "The only module");
+        router.RegisterModule(module);
+
+        router.UnregisterModule("only-module");
+
+        var result = await router.SelectModuleAsync("test request", CancellationToken.None);
+        Assert.Null(result);
+    }
 }
