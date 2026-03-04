@@ -363,6 +363,11 @@ foreach (var module in host.Services.GetServices<IVitruvianModule>())
     requestProcessor.RegisterModule(module);
 }
 
+foreach (var module in InstalledModuleLoader.LoadFromPluginsPath(pluginsPath, host.Services))
+{
+    requestProcessor.RegisterModule(module);
+}
+
 var discordToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
 var discordChannelId = Environment.GetEnvironmentVariable("DISCORD_CHANNEL_ID");
 var webSocketUrl = Environment.GetEnvironmentVariable("VITRUVIAN_WEBSOCKET_URL");
