@@ -592,6 +592,10 @@ public static class ModuleInstaller
             }
 
             Environment.SetEnvironmentVariable(secretName, provided);
+
+            // Persist the secret to .env.Vitruvian so it survives process restarts.
+            try { EnvFileLoader.PersistSecret(secretName, provided); }
+            catch { /* best-effort — the process env var is already set */ }
         }
 
         error = string.Empty;

@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using VitruvianAbstractions.Interfaces;
+using VitruvianPluginSdk.Attributes;
 
 namespace VitruvianCli;
 
@@ -38,6 +39,8 @@ public static class InstalledModuleLoader
         {
             try
             {
+                WarnOnMissingApiKeys(moduleType);
+
                 if (ActivatorUtilities.CreateInstance(services, moduleType) is IVitruvianModule module)
                     modules.Add(module);
             }
@@ -48,5 +51,39 @@ public static class InstalledModuleLoader
         }
 
         return modules;
+    }
+
+    /// <summary>
+    /// Inspects the <see cref="RequiresApiKeyAttribute"/> declarations on
+    /// <paramref name="moduleType"/> and emits a console warning for each
+    /// environment variable that is not set.
+    /// </summary>
+    internal static IReadOnlyList<string> WarnOnMissingApiKeys(Type moduleType)
+    {
+        var missing = GetMissingApiKeys(moduleType);
+        foreach (var envVar in missing)
+        {
+            Console.WriteLine(
+                $"[WARN] Module '{moduleType.Name}' requires API key '{envVar}' but the environment variable is not set. " +
+                "Set it in .env.Vitruvian or as an environment variable.");
+        }
+
+        return missing;
+    }
+
+    /// <summary>
+    /// Returns the list of environment variable names declared via
+    /// <see cref="RequiresApiKeyAttribute"/> on <paramref name="moduleType"/>
+    /// that are currently unset or empty.
+    /// </summary>
+    internal static IReadOnlyList<string> GetMissingApiKeys(Type moduleType)
+    {
+        return moduleType
+            .GetCustomAttributes<RequiresApiKeyAttribute>(inherit: true)
+            .Select(static attr => attr.EnvironmentVariable.Trim())
+            .Where(static envVar => envVar.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(static envVar => string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(envVar)))
+            .ToArray();
     }
 }

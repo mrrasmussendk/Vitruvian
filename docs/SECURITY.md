@@ -234,7 +234,7 @@ Optional fields:
 - **`.dll` install**: Must contain a UtilityAI module type, manifest must exist alongside the DLL, required secrets must be set or entered at the install prompt, and the assembly must be signed unless `--allow-unsigned` is passed.
 - **`.nupkg` install**: Must contain compatible assemblies, the package root must contain `Vitruvian-manifest.json`, and the same signing and secrets requirements apply.
 
-Secrets entered at the install prompt are scoped to the current Vitruvian process only.
+Secrets entered at the install prompt are persisted to the `.env.Vitruvian` file so they are available on subsequent runs. See [Extending — Declare required API keys](EXTENDING.md#4-declare-required-api-keys) for details on how modules declare and consume API keys.
 
 ---
 

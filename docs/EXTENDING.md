@@ -49,7 +49,63 @@ Available access levels (combinable as flags):
 See [Security — Permission Model](SECURITY.md#permission-model) for the full
 enforcement model and runtime API.
 
-## 4) Build and install
+## 4) Declare required API keys
+
+If your module needs API keys or other secrets at runtime, declare them with the
+`[RequiresApiKey]` attribute. Each attribute takes the name of the environment
+variable that must hold the key:
+
+```csharp
+using UtilityAi.Vitruvian.PluginSdk.Attributes;
+
+[RequiresApiKey("WEATHER_API_KEY")]
+[RequiresApiKey("GEOCODING_API_KEY")]
+public sealed class WeatherModule : IVitruvianModule
+{
+    public string Domain => "weather";
+    public string Description => "Fetches weather data";
+
+    public Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
+    {
+        // Read the key at execution time from the environment.
+        var apiKey = Environment.GetEnvironmentVariable("WEATHER_API_KEY");
+        // ... use apiKey to call the external service ...
+        return Task.FromResult("sunny");
+    }
+}
+```
+
+### How it works
+
+| Phase | What happens |
+|-------|--------------|
+| **Install time** | The installer scans the module DLL for `[RequiresApiKey]` attributes, checks whether each environment variable is already set, and prompts the user for any missing values. Provided values are persisted to the `.env.Vitruvian` file so they survive process restarts. |
+| **Startup** | `EnvFileLoader` loads `.env.Vitruvian` before any plugin code runs, making the keys available via `Environment.GetEnvironmentVariable()`. |
+| **Module load** | `InstalledModuleLoader` inspects each module for missing API keys and emits `[WARN]` messages for any that are not set. The module is still loaded, but may fail at execution time. |
+
+### Providing keys manually
+
+You can also set the keys yourself before starting Vitruvian:
+
+```bash
+# Option 1 — add to .env.Vitruvian
+echo 'WEATHER_API_KEY=sk-abc123' >> .env.Vitruvian
+
+# Option 2 — export before running
+export WEATHER_API_KEY=sk-abc123
+dotnet run --project samples/Vitruvian.SampleHost
+```
+
+You may additionally list the same keys in your plugin's
+`vitruvian-manifest.json` under `RequiredSecrets` for documentation purposes:
+
+```json
+{
+  "RequiredSecrets": ["WEATHER_API_KEY", "GEOCODING_API_KEY"]
+}
+```
+
+## 5) Build and install
 
 Build/publish the plugin and place outputs in a `plugins/` folder next to the host executable, or install via CLI:
 
@@ -57,7 +113,7 @@ Build/publish the plugin and place outputs in a `plugins/` folder next to the ho
 Vitruvian --install-module /absolute/path/MyPlugin.dll
 ```
 
-## 5) Example
+## 6) Example
 
 See:
 

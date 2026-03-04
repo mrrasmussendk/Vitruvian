@@ -78,6 +78,41 @@ public static class EnvFileLoader
         return Environment.GetEnvironmentVariable(key) is null;
     }
 
+    /// <summary>
+    /// Persists <paramref name="key"/>=<paramref name="value"/> to the <c>.env.Vitruvian</c>
+    /// file.  If the file already contains an entry for <paramref name="key"/> it is updated
+    /// in-place; otherwise a new line is appended.  When no existing file is found, one is
+    /// created in <paramref name="fallbackDirectory"/> (defaults to the current directory).
+    /// </summary>
+    public static void PersistSecret(string key, string value, string? fallbackDirectory = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentNullException.ThrowIfNull(value);
+
+        var searchDirs = new[] { fallbackDirectory ?? Directory.GetCurrentDirectory(), AppContext.BaseDirectory };
+        var path = FindFile(searchDirs) ?? Path.Combine(searchDirs[0], FileName);
+
+        // Read existing lines (or start with an empty list for a new file).
+        var lines = File.Exists(path) ? File.ReadAllLines(path).ToList() : new List<string>();
+        var replaced = false;
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var (parsedKey, _) = ParseLine(lines[i]);
+            if (parsedKey is not null && string.Equals(parsedKey, key, StringComparison.Ordinal))
+            {
+                lines[i] = $"{key}={value}";
+                replaced = true;
+                break;
+            }
+        }
+
+        if (!replaced)
+            lines.Add($"{key}={value}");
+
+        File.WriteAllLines(path, lines);
+    }
+
     public static string? FindFile(string startDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(startDirectory);
