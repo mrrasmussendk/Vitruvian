@@ -32,6 +32,9 @@ public sealed class GoapPlanner
     /// <returns><c>true</c> if a module was found and removed; otherwise <c>false</c>.</returns>
     public bool UnregisterModule(string domain)
     {
+        if (string.IsNullOrWhiteSpace(domain))
+            return false;
+
         return _modules.RemoveAll(m => m.Domain == domain) > 0;
     }
 

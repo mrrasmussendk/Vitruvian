@@ -67,6 +67,9 @@ public sealed class RequestProcessor
     /// <returns><c>true</c> if a module was found and removed; otherwise <c>false</c>.</returns>
     public bool UnregisterModule(string domain)
     {
+        if (string.IsNullOrWhiteSpace(domain))
+            return false;
+
         if (!_modules.Remove(domain))
             return false;
 
