@@ -79,4 +79,29 @@ public sealed class ModuleInstallerTests
                 Directory.Delete(tempRoot, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task InstallWithResultAsync_WithNonModuleAssembly_ReturnsActionableCompatibilityMessage()
+    {
+        var pluginsPath = Path.Combine(Path.GetTempPath(), $"vitruvian-install-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(pluginsPath);
+
+        try
+        {
+            var result = await ModuleInstaller.InstallWithResultAsync(
+                typeof(ModuleInstaller).Assembly.Location,
+                pluginsPath,
+                allowUnsigned: true);
+
+            Assert.False(result.Success);
+            Assert.Contains("compatible Vitruvian module assembly", result.Message);
+            Assert.Contains("IVitruvianModule", result.Message);
+            Assert.DoesNotContain("compatible UtilityAI module assembly", result.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(pluginsPath))
+                Directory.Delete(pluginsPath, recursive: true);
+        }
+    }
 }

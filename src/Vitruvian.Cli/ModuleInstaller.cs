@@ -674,6 +674,7 @@ public static class ModuleInstaller
 
     private static bool TryValidateModuleAssembly(string assemblyPath, out string error)
     {
+        string? loadFailureReason = null;
         var loadContext = new AssemblyLoadContext($"VitruvianModuleValidation.{Guid.NewGuid():N}", isCollectible: true);
         try
         {
@@ -695,29 +696,41 @@ public static class ModuleInstaller
                 error = string.Empty;
                 return true;
             }
+
+            loadFailureReason = string.Join("; ", ex.LoaderExceptions
+                .Where(static loaderException => loaderException is not null)
+                .Select(static loaderException => loaderException!.Message.Trim())
+                .Where(static message => message.Length > 0));
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException ex)
         {
-            // handled below
+            loadFailureReason = ex.Message;
         }
-        catch (FileLoadException)
+        catch (FileLoadException ex)
         {
-            // handled below
+            loadFailureReason = ex.Message;
         }
-        catch (BadImageFormatException)
+        catch (BadImageFormatException ex)
         {
-            // handled below
+            loadFailureReason = ex.Message;
         }
-        catch (NotSupportedException)
+        catch (NotSupportedException ex)
         {
-            // handled below
+            loadFailureReason = ex.Message;
         }
         finally
         {
             loadContext.Unload();
         }
 
-        error = $"Module install failed: '{Path.GetFileName(assemblyPath)}' is not a compatible UtilityAI module assembly.";
+        var guidance = "Ensure it targets a framework compatible with this Vitruvian CLI and includes a public non-abstract class implementing IVitruvianModule.";
+        if (string.IsNullOrWhiteSpace(loadFailureReason))
+        {
+            error = $"Module install failed: '{Path.GetFileName(assemblyPath)}' is not a compatible Vitruvian module assembly. {guidance}";
+            return false;
+        }
+
+        error = $"Module install failed: '{Path.GetFileName(assemblyPath)}' is not a compatible Vitruvian module assembly. {guidance} Load error: {loadFailureReason}";
         return false;
     }
 
