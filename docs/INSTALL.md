@@ -98,11 +98,13 @@ Supported profiles:
 6. **Choose deployment mode**
    - Local console
    - Discord channel
+   - WebSocket host
 7. **Choose storage mode**
    - Default local SQLite: `Data Source=appdb/compass-memory.db`
    - Third-party connection string
 
 If you select Discord, setup requires both `DISCORD_BOT_TOKEN` and `DISCORD_CHANNEL_ID`.
+If you select WebSocket host, setup requires `COMPASS_WEBSOCKET_URL` (for example `ws://0.0.0.0:5005/compass/`).
 
 ### Quick profile switch (non-interactive)
 
@@ -140,6 +142,9 @@ If you prefer to set environment variables yourself, export the following before
 | `DISCORD_CHANNEL_ID` | No | Target Discord channel (requires `DISCORD_BOT_TOKEN`) |
 | `DISCORD_POLL_INTERVAL_SECONDS` | No | Tune Discord polling interval |
 | `DISCORD_MESSAGE_LIMIT` | No | Tune Discord message fetch limit |
+| `COMPASS_WEBSOCKET_URL` | No | Enables WebSocket host mode (checked before Discord mode) |
+| `COMPASS_WEBSOCKET_PUBLIC_URL` | No | Public-facing WebSocket URL shown in startup helpers |
+| `COMPASS_WEBSOCKET_DOMAIN` | No | Default domain tag prepended to incoming WebSocket requests |
 
 Example (Linux / macOS):
 
@@ -168,6 +173,7 @@ Compass SampleHost started. Type a request (or 'quit' to exit):
 ```
 
 If `DISCORD_BOT_TOKEN` and `DISCORD_CHANNEL_ID` are set, the host switches to Discord mode and polls the configured channel for messages.
+If `COMPASS_WEBSOCKET_URL` is set, the host starts a WebSocket listener and returns JSON responses with deployment helper hints (`request`, `domain`, `userId`).
 
 ---
 

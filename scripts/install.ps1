@@ -140,8 +140,9 @@ Write-Host ''
 Write-Host 'Select deployment mode:'
 Write-Host '  1) Local console'
 Write-Host '  2) Discord channel'
+Write-Host '  3) WebSocket host'
 $deployChoice = Read-Host '>'
-if ($deployChoice -ne '1' -and $deployChoice -ne '2') { throw 'Invalid deployment choice' }
+if ($deployChoice -ne '1' -and $deployChoice -ne '2' -and $deployChoice -ne '3') { throw 'Invalid deployment choice' }
 
 Write-Host ''
 Write-Host 'Select memory storage:'
@@ -174,6 +175,17 @@ if ($deployChoice -eq '2') {
     $lines += "`$env:DISCORD_BOT_TOKEN='$discordToken'"
     $lines += "`$env:DISCORD_CHANNEL_ID='$discordChannel'"
 }
+elseif ($deployChoice -eq '3') {
+    $webSocketUrl = Read-Host 'Enter COMPASS_WEBSOCKET_URL [ws://0.0.0.0:5005/compass/]'
+    if ([string]::IsNullOrWhiteSpace($webSocketUrl)) { $webSocketUrl = 'ws://0.0.0.0:5005/compass/' }
+    $webSocketPublicUrl = Read-Host "Enter COMPASS_WEBSOCKET_PUBLIC_URL [$webSocketUrl]"
+    if ([string]::IsNullOrWhiteSpace($webSocketPublicUrl)) { $webSocketPublicUrl = $webSocketUrl }
+    $webSocketDomain = Read-Host 'Enter COMPASS_WEBSOCKET_DOMAIN [dev]'
+    if ([string]::IsNullOrWhiteSpace($webSocketDomain)) { $webSocketDomain = 'dev' }
+    $lines += "`$env:COMPASS_WEBSOCKET_URL='$webSocketUrl'"
+    $lines += "`$env:COMPASS_WEBSOCKET_PUBLIC_URL='$webSocketPublicUrl'"
+    $lines += "`$env:COMPASS_WEBSOCKET_DOMAIN='$webSocketDomain'"
+}
 
 $lines | Set-Content -Path $ProfileEnvFile -Encoding UTF8
 Set-ActiveProfile $resolvedProfile
@@ -196,3 +208,4 @@ Write-Host ''
 Write-Host 'The host loads .env.compass automatically — no need to source the file.'
 Write-Host 'To switch profiles quickly, run: .\scripts\install.ps1 -Profile <dev|personal|team|prod>'
 Write-Host 'If Discord variables are configured, the host will start in Discord mode automatically.'
+Write-Host 'If COMPASS_WEBSOCKET_URL is configured, the host will start in WebSocket mode before Discord mode.'

@@ -365,7 +365,26 @@ foreach (var module in host.Services.GetServices<ICompassModule>())
 
 var discordToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
 var discordChannelId = Environment.GetEnvironmentVariable("DISCORD_CHANNEL_ID");
-if (!string.IsNullOrWhiteSpace(discordToken) && !string.IsNullOrWhiteSpace(discordChannelId))
+var webSocketUrl = Environment.GetEnvironmentVariable("COMPASS_WEBSOCKET_URL");
+var webSocketPublicUrl = Environment.GetEnvironmentVariable("COMPASS_WEBSOCKET_PUBLIC_URL");
+var webSocketDomain = Environment.GetEnvironmentVariable("COMPASS_WEBSOCKET_DOMAIN");
+if (!string.IsNullOrWhiteSpace(webSocketUrl))
+{
+    using var cts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) =>
+    {
+        e.Cancel = true;
+        cts.Cancel();
+    };
+
+    var bridge = new WebSocketChannelBridge(webSocketUrl, webSocketPublicUrl, webSocketDomain);
+    await bridge.RunAsync(async (request, token) =>
+    {
+        var response = await requestProcessor.ProcessAsync(request, token);
+        return response;
+    }, cts.Token);
+}
+else if (!string.IsNullOrWhiteSpace(discordToken) && !string.IsNullOrWhiteSpace(discordChannelId))
 {
     Console.WriteLine("Vitruvian CLI started in Discord mode.");
     using var cts = new CancellationTokenSource();

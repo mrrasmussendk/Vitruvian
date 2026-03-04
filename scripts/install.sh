@@ -132,8 +132,9 @@ echo
 echo "Select deployment mode:"
 echo "  1) Local console"
 echo "  2) Discord channel"
+echo "  3) WebSocket host"
 read -r -p "> " deploy_choice
-if [[ "$deploy_choice" != "1" && "$deploy_choice" != "2" ]]; then
+if [[ "$deploy_choice" != "1" && "$deploy_choice" != "2" && "$deploy_choice" != "3" ]]; then
   echo "Invalid deployment choice"
   exit 1
 fi
@@ -179,6 +180,18 @@ if [[ "$deploy_choice" == "2" ]]; then
     echo "export DISCORD_BOT_TOKEN=${discord_token}"
     echo "export DISCORD_CHANNEL_ID=${discord_channel}"
   } >> "$profile_env_file"
+elif [[ "$deploy_choice" == "3" ]]; then
+  read -r -p "Enter COMPASS_WEBSOCKET_URL [ws://0.0.0.0:5005/compass/]: " websocket_url
+  websocket_url="${websocket_url:-ws://0.0.0.0:5005/compass/}"
+  read -r -p "Enter COMPASS_WEBSOCKET_PUBLIC_URL [${websocket_url}]: " websocket_public_url
+  websocket_public_url="${websocket_public_url:-$websocket_url}"
+  read -r -p "Enter COMPASS_WEBSOCKET_DOMAIN [dev]: " websocket_domain
+  websocket_domain="${websocket_domain:-dev}"
+  {
+    echo "export COMPASS_WEBSOCKET_URL=${websocket_url}"
+    echo "export COMPASS_WEBSOCKET_PUBLIC_URL=${websocket_public_url}"
+    echo "export COMPASS_WEBSOCKET_DOMAIN=${websocket_domain}"
+  } >> "$profile_env_file"
 fi
 
 write_active_profile "$profile"
@@ -208,4 +221,5 @@ cat <<EOF
 The host loads .env.compass automatically — no need to source the file.
 To switch profiles quickly, run: ./scripts/install.sh <dev|personal|team|prod>
 If Discord variables are configured, the host will start in Discord mode automatically.
+If COMPASS_WEBSOCKET_URL is configured, the host will start in WebSocket mode before Discord mode.
 EOF
