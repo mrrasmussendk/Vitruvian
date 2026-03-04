@@ -8,7 +8,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.0.7</Version>
+    <Version>0.0.8</Version>
     <PackageId>Vitruvian.PluginSdk</PackageId>
     <Authors>Vitruvian</Authors>
     <Description>SDK attributes and contracts for building Vitruvian modules.</Description>
