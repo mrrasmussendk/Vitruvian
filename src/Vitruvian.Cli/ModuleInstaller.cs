@@ -202,13 +202,14 @@ public static class ModuleInstaller
         var classPath = Path.Combine(moduleDirectory, $"{className}.cs");
         var manifestPath = Path.Combine(moduleDirectory, ManifestFileName);
         var readmePath = Path.Combine(moduleDirectory, "README.md");
+        var scaffoldTargetFramework = GetCurrentTargetFrameworkMoniker();
 
         File.WriteAllText(projectPath,
             $$"""
             <Project Sdk="Microsoft.NET.Sdk">
 
               <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
+                <TargetFramework>{{scaffoldTargetFramework}}</TargetFramework>
                 <ImplicitUsings>enable</ImplicitUsings>
                 <Nullable>enable</Nullable>
                 <Version>1.0.0</Version>
@@ -340,7 +341,7 @@ public static class ModuleInstaller
             dotnet build -c Release
 
             # Install the module (adjust path to your Vitruvian installation)
-            vitruvian --install-module ./bin/Release/net10.0/{{moduleName}}.dll --allow-unsigned
+            vitruvian --install-module ./bin/Release/{{scaffoldTargetFramework}}/{{moduleName}}.dll --allow-unsigned
             ```
 
             ### Option 2: Copy to plugins folder
@@ -350,7 +351,7 @@ public static class ModuleInstaller
             dotnet build
 
             # Copy DLL and manifest to Vitruvian plugins directory
-            cp bin/Debug/net10.0/{{moduleName}}.dll /path/to/vitruvian/plugins/
+            cp bin/Debug/{{scaffoldTargetFramework}}/{{moduleName}}.dll /path/to/vitruvian/plugins/
             cp vitruvian-manifest.json /path/to/vitruvian/plugins/
             ```
 
@@ -447,7 +448,7 @@ public static class ModuleInstaller
             - [SECURITY.md](https://github.com/mrrasmussendk/Vitruvian/blob/main/docs/SECURITY.md)
             """);
 
-        return $"Created module scaffold at '{moduleDirectory}' with manifest and README. Build with 'dotnet build', then install with 'vitruvian --install-module ./bin/Debug/net10.0/{moduleName}.dll --allow-unsigned'.";
+        return $"Created module scaffold at '{moduleDirectory}' with manifest and README. Build with 'dotnet build', then install with 'vitruvian --install-module ./bin/Debug/{scaffoldTargetFramework}/{moduleName}.dll --allow-unsigned'.";
     }
 
     public static async Task<ModuleInspectionReport> InspectAsync(string moduleSpec, CancellationToken cancellationToken = default)
@@ -777,6 +778,16 @@ public static class ModuleInstaller
             return OperatingSystem.IsMacOS();
 
         return true;
+    }
+
+    private static string GetCurrentTargetFrameworkMoniker()
+    {
+        const string frameworkNamePrefix = ".NETCoreApp,Version=v";
+        var frameworkName = AppContext.TargetFrameworkName;
+        if (frameworkName?.StartsWith(frameworkNamePrefix, StringComparison.OrdinalIgnoreCase) is true)
+            return $"net{frameworkName[frameworkNamePrefix.Length..]}";
+
+        return $"net{Environment.Version.Major}.0";
     }
 
     private static bool IsUtilityAiModuleType(Type type)
