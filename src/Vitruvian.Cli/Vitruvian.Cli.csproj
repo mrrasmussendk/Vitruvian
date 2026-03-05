@@ -34,6 +34,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>false</Pack>
     </Content>
+    <Content Include="..\..\modules\Vitruvian.GmailModule\bin\Release\net8.0\Vitruvian.GmailModule.dll" Link="modules/Vitruvian.GmailModule.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <PackagePath>tools/net8.0/any/modules</PackagePath>
+      <Pack>true</Pack>
+    </Content>
   </ItemGroup>
 
 </Project>

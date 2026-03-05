@@ -126,7 +126,11 @@ public static class ModuleSelector
                 continue;
 
             if (string.Equals(line, "done", StringComparison.OrdinalIgnoreCase))
+            {
+                writer.WriteLine();
+                PromptForMissingApiKeys(availableModules, currentPreferences, reader, writer);
                 break;
+            }
 
             if (string.Equals(line, "all", StringComparison.OrdinalIgnoreCase))
             {
@@ -240,7 +244,14 @@ public static class ModuleSelector
     }
 
     internal static IReadOnlyList<string> GetApiKeysForType(Type moduleType)
-        => InstalledModuleLoader.GetMissingApiKeys(moduleType);
+    {
+        return moduleType
+            .GetCustomAttributes<RequiresApiKeyAttribute>(inherit: true)
+            .Select(static attr => attr.EnvironmentVariable.Trim())
+            .Where(static envVar => envVar.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
     private static string ToKebabCase(string value)
     {
@@ -264,5 +275,144 @@ public static class ModuleSelector
         }
 
         return result.ToString();
+    }
+
+    /// <summary>
+    /// Prompts the user for any missing API keys required by enabled modules.
+    /// Shows existing keys (masked) and allows keeping or replacing them.
+    /// </summary>
+    private static void PromptForMissingApiKeys(
+        IReadOnlyList<ModuleInfo> availableModules,
+        ModulePreferences preferences,
+        TextReader reader,
+        TextWriter writer)
+    {
+        var enabledModulesWithKeys = availableModules
+            .Where(m => preferences.IsModuleEnabled(m.Domain) && m.RequiredApiKeys.Count > 0)
+            .ToList();
+
+        if (enabledModulesWithKeys.Count == 0)
+            return;
+
+        // Collect all required API keys
+        var requiredKeys = new HashSet<string>();
+        foreach (var module in enabledModulesWithKeys)
+        {
+            foreach (var key in module.RequiredApiKeys)
+                requiredKeys.Add(key);
+        }
+
+        if (requiredKeys.Count == 0)
+            return;
+
+        writer.WriteLine("Checking API keys for enabled modules...");
+        writer.WriteLine();
+
+        var needsPrompt = false;
+        foreach (var key in requiredKeys.OrderBy(k => k))
+        {
+            var existingValue = Environment.GetEnvironmentVariable(key);
+            var hasExisting = !string.IsNullOrWhiteSpace(existingValue);
+
+            var modulesNeedingKey = enabledModulesWithKeys
+                .Where(m => m.RequiredApiKeys.Contains(key))
+                .Select(m => m.Domain)
+                .ToList();
+
+            if (hasExisting)
+            {
+                var masked = MaskSecret(existingValue!);
+                writer.WriteLine($"  {key} (required by: {string.Join(", ", modulesNeedingKey)})");
+                writer.WriteLine($"    Current value: {masked}");
+                writer.Write($"    Keep existing? (Y/n): ");
+
+                var keepResponse = reader.ReadLine()?.Trim().ToLowerInvariant();
+                if (keepResponse != "n" && keepResponse != "no")
+                {
+                    writer.WriteLine("    ✓ Kept existing value.\n");
+                    continue;
+                }
+
+                writer.Write($"    Enter new value: ");
+            }
+            else
+            {
+                writer.WriteLine($"  {key} (required by: {string.Join(", ", modulesNeedingKey)})");
+                writer.Write($"  Enter value (or press Enter to skip): ");
+                needsPrompt = true;
+            }
+
+            string? value;
+            if (Console.IsInputRedirected)
+            {
+                value = reader.ReadLine();
+            }
+            else
+            {
+                // Read secret without echoing
+                value = ReadSecretFromConsole();
+                writer.WriteLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                try
+                {
+                    EnvFileLoader.PersistSecret(key, value);
+                    Environment.SetEnvironmentVariable(key, value);
+                    writer.WriteLine($"  ✓ {key} saved.\n");
+                }
+                catch (Exception ex)
+                {
+                    writer.WriteLine($"  ✗ Failed to save {key}: {ex.Message}\n");
+                }
+            }
+            else
+            {
+                writer.WriteLine($"  Skipped {key}. You can set it later in your .env.Vitruvian file.\n");
+            }
+        }
+
+        if (!needsPrompt && requiredKeys.All(k => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(k))))
+        {
+            writer.WriteLine("All required API keys are configured.");
+        }
+    }
+
+    private static string MaskSecret(string value)
+    {
+        if (value.Length <= 8)
+            return new string('*', value.Length);
+
+        var visibleChars = 4;
+        var visible = value[..visibleChars];
+        var masked = new string('*', Math.Min(value.Length - visibleChars, 12));
+        return $"{visible}{masked}";
+    }
+
+    private static string ReadSecretFromConsole()
+    {
+        var buffer = new List<char>();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter)
+                return new string(buffer.ToArray());
+
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (buffer.Count == 0)
+                    continue;
+                buffer.RemoveAt(buffer.Count - 1);
+                Console.Write("\b \b");
+                continue;
+            }
+
+            if (!char.IsControl(key.KeyChar))
+            {
+                buffer.Add(key.KeyChar);
+                Console.Write('*');
+            }
+        }
     }
 }

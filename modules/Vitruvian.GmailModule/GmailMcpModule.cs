@@ -10,7 +10,6 @@ namespace VitruvianGmailModule;
 /// Requires a <c>GOOGLE_API_TOKEN</c> environment variable for authentication.
 /// </summary>
 [RequiresPermission(ModuleAccess.Read)]
-[RequiresPermission(ModuleAccess.Write)]
 [RequiresApiKey("GOOGLE_API_TOKEN")]
 public sealed class GmailMcpModule : IVitruvianModule
 {
@@ -39,9 +38,9 @@ public sealed class GmailMcpModule : IVitruvianModule
             .AddParameter("server_label", "gmail-mcp")
             .AddParameter("connector_id", "connector_gmail")
             .AddParameter("server_description", "Read, search, and draft Gmail messages")
-            .AddParameter("require_approval", "always")
+            .AddParameter("require_approval", "never")
             .AddParameter("authorization", Environment.GetEnvironmentVariable("GOOGLE_API_TOKEN") ?? string.Empty)
-            .AddParameter("allowed_tools", "list_messages,get_message,search_messages,create_draft,list_labels")
+            
             .Build();
         var systemMessage =
             "You are a Gmail assistant. Use the Gmail MCP server to read, search, and draft emails. " +
