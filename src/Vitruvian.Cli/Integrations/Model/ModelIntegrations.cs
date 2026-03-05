@@ -165,6 +165,19 @@ file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpCl
             if (!json.RootElement.TryGetProperty("output", out var output) || output.GetArrayLength() == 0)
                 throw new InvalidOperationException("OpenAI API returned a response with missing or malformed output field.");
 
+            var approvalRequest = output
+                .EnumerateArray()
+                .FirstOrDefault(static item =>
+                    item.TryGetProperty("type", out var type) &&
+                    type.GetString() == "mcp_approval_request");
+            if (approvalRequest.ValueKind != JsonValueKind.Undefined)
+            {
+                var toolName = approvalRequest.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
+                var serverLabel = approvalRequest.TryGetProperty("server_label", out var serverElement) ? serverElement.GetString() : null;
+                throw new InvalidOperationException(
+                    $"OpenAI MCP approval is required for tool '{toolName ?? "unknown"}' on server '{serverLabel ?? "unknown"}', but interactive MCP approval is not implemented in Vitruvian yet. Set require_approval to 'never' for this tool or extend the OpenAI integration to send mcp_approval_response.");
+            }
+
             var texts = new List<string>();
             foreach (var item in output.EnumerateArray())
             {
