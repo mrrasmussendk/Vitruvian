@@ -323,8 +323,12 @@ if (startupArgs.Length >= 1 &&
     var setupCompleted = ModuleInstaller.TryRunInstallScript();
     if (setupCompleted)
     {
-        EnvFileLoader.Load(overwriteExisting: true);
+        EnvFileLoader.Load(startDirectory: AppContext.BaseDirectory, overwriteExisting: true);
         Console.WriteLine($"Vitruvian setup complete. Current persona: {GetCurrentPersonaDisplay()}.");
+        if (ModelConfiguration.TryCreateFromEnvironment(out var setupModelConfig, out var setupError) && setupModelConfig is not null)
+            Console.WriteLine($"Model provider configured: {setupModelConfig.Provider} ({setupModelConfig.Model})");
+        else if (!string.IsNullOrWhiteSpace(setupError))
+            Console.WriteLine($"Model configuration warning: {setupError}");
     }
     else
     {
@@ -381,7 +385,7 @@ if (!ModelConfiguration.TryCreateFromEnvironment(out var modelConfiguration, out
     Console.WriteLine("No Vitruvian setup found. Running installer...");
     if (ModuleInstaller.TryRunInstallScript())
     {
-        EnvFileLoader.Load(overwriteExisting: true);
+        EnvFileLoader.Load(startDirectory: AppContext.BaseDirectory, overwriteExisting: true);
         ModelConfiguration.TryCreateFromEnvironment(out modelConfiguration, out modelConfigurationError);
     }
 }
