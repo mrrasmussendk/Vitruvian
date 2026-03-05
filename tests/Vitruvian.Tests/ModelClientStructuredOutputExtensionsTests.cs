@@ -1,6 +1,7 @@
 using VitruvianAbstractions.Interfaces;
 using Xunit;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace VitruvianTests;
 
@@ -39,6 +40,12 @@ public sealed class ModelClientStructuredOutputExtensionsTests
         public required string Name { get; init; }
         public string? Notes { get; init; }
     }
+
+    public sealed record GeneratedCommand(
+        [property: JsonPropertyName("order")] int Order,
+        [property: JsonPropertyName("command")] string Command,
+        [property: JsonPropertyName("purpose")] string Purpose,
+        [property: JsonPropertyName("parameters")] Dictionary<string, string>? Parameters = null);
 
     [Fact]
     public async Task GenerateStructuredAsync_DeserializesTypedOutput_AndInjectsSchemaInstructions()
@@ -102,5 +109,34 @@ public sealed class ModelClientStructuredOutputExtensionsTests
 
         Assert.Contains("Name", required);
         Assert.DoesNotContain("Notes", required);
+    }
+
+    [Fact]
+    public async Task GenerateStructuredAsync_JsonPropertyNameAndDictionary_AreRepresentedInSchema()
+    {
+        var client = new CapturingModelClient(
+            """{"order":1,"command":"copy","purpose":"copy files","parameters":{"source":"a.txt","target":"b.txt"}}""");
+
+        var result = await client.GenerateStructuredAsync<GeneratedCommand>("Extract command");
+
+        Assert.Equal(1, result.Order);
+        Assert.Equal("copy", result.Command);
+        Assert.Equal("copy files", result.Purpose);
+        Assert.Equal("a.txt", result.Parameters!["source"]);
+        Assert.NotNull(client.LastRequest);
+
+        var schemaMarker = "JSON Schema:\n";
+        var index = client.LastRequest!.SystemMessage!.IndexOf(schemaMarker, StringComparison.Ordinal);
+        Assert.True(index >= 0);
+        var schemaJson = client.LastRequest.SystemMessage[(index + schemaMarker.Length)..];
+        var schema = JsonNode.Parse(schemaJson)!.AsObject();
+        var properties = schema["properties"]!.AsObject();
+        Assert.NotNull(properties["order"]);
+        Assert.NotNull(properties["command"]);
+        Assert.NotNull(properties["purpose"]);
+        Assert.NotNull(properties["parameters"]);
+        var parametersSchema = properties["parameters"]!.AsObject();
+        Assert.Equal("object", parametersSchema["type"]!.GetValue<string>());
+        Assert.Equal("string", parametersSchema["additionalProperties"]!["type"]!.GetValue<string>());
     }
 }

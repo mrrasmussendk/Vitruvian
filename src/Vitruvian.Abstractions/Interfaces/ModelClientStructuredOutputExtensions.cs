@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace VitruvianAbstractions.Interfaces;
 
@@ -123,6 +124,15 @@ public static class ModelClientStructuredOutputExtensions
             };
         }
 
+        if (TryGetDictionaryValueType(type, out var valueType))
+        {
+            return new JsonObject
+            {
+                ["type"] = "object",
+                ["additionalProperties"] = BuildSchema(valueType, depth + 1)
+            };
+        }
+
         var properties = new JsonObject();
         var required = new JsonArray();
         foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
@@ -131,9 +141,10 @@ public static class ModelClientStructuredOutputExtensions
                 continue;
 
             var propertyType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-            properties[property.Name] = BuildSchema(propertyType, depth + 1);
+            var propertyName = property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name ?? property.Name;
+            properties[propertyName] = BuildSchema(propertyType, depth + 1);
             if (!IsNullableProperty(property))
-                required.Add(property.Name);
+                required.Add(propertyName);
         }
 
         return new JsonObject
@@ -166,6 +177,34 @@ public static class ModelClientStructuredOutputExtensions
         }
 
         return false;
+    }
+
+    private static bool TryGetDictionaryValueType(Type type, out Type valueType)
+    {
+        valueType = typeof(object);
+
+        Type? dictionaryType = null;
+        if (type.IsGenericType)
+        {
+            var genericDefinition = type.GetGenericTypeDefinition();
+            if (genericDefinition == typeof(Dictionary<,>) ||
+                genericDefinition == typeof(IDictionary<,>) ||
+                genericDefinition == typeof(IReadOnlyDictionary<,>))
+            {
+                dictionaryType = type;
+            }
+        }
+
+        dictionaryType ??= type.GetInterfaces()
+            .FirstOrDefault(static iface => iface.IsGenericType &&
+                                            (iface.GetGenericTypeDefinition() == typeof(IDictionary<,>) ||
+                                             iface.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)));
+
+        if (dictionaryType is null)
+            return false;
+
+        valueType = Nullable.GetUnderlyingType(dictionaryType.GetGenericArguments()[1]) ?? dictionaryType.GetGenericArguments()[1];
+        return true;
     }
 
     private static bool IsNullableProperty(PropertyInfo property)
