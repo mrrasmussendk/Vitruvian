@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide walks you through installing and running **UtilityAi.Vitruvian**.
+This guide walks you through installing and running **Vitruvian**.
 
 ---
 
@@ -8,21 +8,19 @@ This guide walks you through installing and running **UtilityAi.Vitruvian**.
 
 | Requirement | Details |
 |---|---|
-| [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download) | Build and run the solution |
+| [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download) | Build and run the solution |
 | [Git](https://git-scm.com/) | Clone the repository |
 
 Verify both are installed:
 
 ```bash
-dotnet --version   # should print 10.x
+dotnet --version   # should print 8.x
 git --version
 ```
 
 ---
 
 ## 1. Clone the Repository
-
-Clone the repository:
 
 ```bash
 git clone https://github.com/mrrasmussendk/Vitruvian.git
@@ -34,23 +32,23 @@ cd Vitruvian
 ## 2. Build
 
 ```bash
-dotnet build UtilityAi.Vitruvian.sln
+dotnet build Vitruvian.sln
 ```
 
-A successful build compiles all projects listed in [Solution Layout](#solution-layout).
+A successful build compiles all projects listed in [Repository Layout](#repository-layout).
 
 ---
 
 ## 3. Run Tests
 
 ```bash
-dotnet test UtilityAi.Vitruvian.sln
+dotnet test Vitruvian.sln
 ```
 
 To run a single test class:
 
 ```bash
-dotnet test --filter "FullyQualifiedName~VitruvianGovernedSelectionStrategyTests"
+dotnet test --filter "FullyQualifiedName~GoapPlannerTests"
 ```
 
 ---
@@ -126,7 +124,7 @@ Windows PowerShell:
 
 ## 5. Configure — Manual Setup
 
-If you prefer to set environment variables yourself, export the following before running the main host:
+If you prefer to set environment variables yourself, export the following before running:
 
 | Variable | Required | Description |
 |---|---|---|
@@ -138,6 +136,7 @@ If you prefer to set environment variables yourself, export the following before
 | `VITRUVIAN_MODEL_NAME` | No | Overrides the default model name per provider |
 | `VITRUVIAN_MODEL_MAX_TOKENS` | No | Sets Anthropic `max_tokens` (default `512`) |
 | `VITRUVIAN_MEMORY_CONNECTION_STRING` | No | Memory/persistence connection string (guided setup default: SQLite file connection) |
+| `VITRUVIAN_WORKING_DIRECTORY` | No | Directory used for file operations (default: `~/Vitruvian-workspace`) |
 | `DISCORD_BOT_TOKEN` | No | Enables Discord mode |
 | `DISCORD_CHANNEL_ID` | No | Target Discord channel (requires `DISCORD_BOT_TOKEN`) |
 | `DISCORD_POLL_INTERVAL_SECONDS` | No | Tune Discord polling interval |
@@ -152,28 +151,26 @@ Example (Linux / macOS):
 export VITRUVIAN_MODEL_PROVIDER=openai
 export OPENAI_API_KEY=sk-...
 export VITRUVIAN_MEMORY_CONNECTION_STRING="Data Source=appdb/Vitruvian-memory.db"
-dotnet run --framework net10.0 --project src/UtilityAi.Vitruvian.Cli
+dotnet run --project src/Vitruvian.Cli
 ```
 
 ---
 
-## 6. Run the Sample Host
+## 6. Run
 
 ```bash
-dotnet run --framework net10.0 --project src/UtilityAi.Vitruvian.Cli
+dotnet run --project src/Vitruvian.Cli
 ```
 
 A REPL will start:
 
 ```
-Vitruvian SampleHost started. Type a request (or 'quit' to exit):
+Vitruvian CLI started. Type a request (or 'quit' to exit):
 > summarize this document
-  Goal: Summarize (85%), Lane: Communicate
-> quit
 ```
 
 If `DISCORD_BOT_TOKEN` and `DISCORD_CHANNEL_ID` are set, the host switches to Discord mode and polls the configured channel for messages.
-If `VITRUVIAN_WEBSOCKET_URL` is set, the host starts a WebSocket listener and returns JSON responses with deployment helper hints (`request`, `domain`, `userId`).
+If `VITRUVIAN_WEBSOCKET_URL` is set, the host starts a WebSocket listener and returns JSON responses.
 
 ---
 
@@ -183,34 +180,34 @@ If `VITRUVIAN_WEBSOCKET_URL` is set, the host starts a WebSocket listener and re
 2. Copy the output DLL (and any dependencies) into a `plugins/` folder next to the main host executable:
 
    ```bash
-   mkdir -p src/UtilityAi.Vitruvian.Cli/bin/Debug/net10.0/plugins
-   cp path/to/plugin/bin/Release/net10.0/publish/* \
-      src/UtilityAi.Vitruvian.Cli/bin/Debug/net10.0/plugins/
+   mkdir -p src/Vitruvian.Cli/bin/Debug/net8.0/plugins
+   cp path/to/plugin/bin/Release/net8.0/publish/* \
+      src/Vitruvian.Cli/bin/Debug/net8.0/plugins/
    ```
 
-3. Run the main host — it will discover all `ICapabilityModule` and `ISensor` types automatically.
+3. Run the host — it will discover all `IVitruvianModule` types automatically.
 
-See the [root README](../README.md#step-by-step-build-your-first-capability-module) for details on writing your own plugin.
+See [EXTENDING.md](EXTENDING.md) for details on writing your own plugin.
 
 ---
 
-## Solution Layout
+## Repository Layout
 
 ```
-UtilityAi.Vitruvian.sln
+Vitruvian.sln
 ├── src/
-│   ├── UtilityAi.Vitruvian.Abstractions/  ← Enums, facts, interfaces
-│   ├── UtilityAi.Vitruvian.Runtime/       ← Sensors, modules, strategy, DI
-│   ├── UtilityAi.Vitruvian.PluginSdk/     ← Attributes + metadata provider
-│   ├── UtilityAi.Vitruvian.PluginHost/    ← Plugin loader (AssemblyLoadContext)
-│   ├── UtilityAi.Vitruvian.Hitl/          ← Human-in-the-loop gate (optional)
-│   ├── UtilityAi.Vitruvian.StandardModules/ ← Built-in reusable modules
-│   ├── UtilityAi.Vitruvian.WeatherModule/   ← Example weather-oriented module
-│   └── UtilityAi.Vitruvian.Cli/             ← CLI host/tooling
-├── samples/
-│   └── Vitruvian.SampleHost/              ← Console REPL / Discord demo host
-└── tests/
-    └── UtilityAi.Vitruvian.Tests/         ← xUnit tests
+│   ├── Vitruvian.Abstractions/      ← Core interfaces, enums, facts, planning types
+│   ├── Vitruvian.Runtime/           ← GoapPlanner, PlanExecutor, ModuleRouter, DI
+│   ├── Vitruvian.PluginSdk/         ← SDK attributes for module metadata
+│   ├── Vitruvian.PluginHost/        ← Plugin loader (AssemblyLoadContext), sandboxing
+│   ├── Vitruvian.Hitl/              ← ConsoleApprovalGate, HITL facts
+│   ├── Vitruvian.StandardModules/   ← Built-in modules (File, Conversation, Web, …)
+│   ├── Vitruvian.WeatherModule/     ← Example standalone module
+│   └── Vitruvian.Cli/               ← CLI entry point, RequestProcessor
+├── tests/
+│   └── Vitruvian.Tests/             ← xUnit tests
+├── docs/                            ← Detailed documentation
+└── scripts/                         ← Guided setup (install.sh / install.ps1)
 ```
 
 ---
@@ -219,9 +216,9 @@ UtilityAi.Vitruvian.sln
 
 | Problem | Fix |
 |---|---|
-| Build cannot restore UtilityAi | Ensure https://api.nuget.org/v3/index.json is reachable |
-| `dotnet: command not found` | Install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download) and ensure it is on your `PATH` |
-| Build error about target framework `net10.0` | Confirm you have .NET **10** (not an older SDK) installed |
+| `dotnet: command not found` | Install the [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download) and ensure it is on your `PATH` |
+| Build error about target framework | Confirm you have .NET **8** SDK installed (`dotnet --version` → 8.x) |
+| Build cannot restore packages | Ensure https://api.nuget.org/v3/index.json is reachable |
 | API key errors at runtime | Double-check the correct `*_API_KEY` variable is set for your chosen `VITRUVIAN_MODEL_PROVIDER`; re-run setup and press Enter on key prompt to reuse cached key for existing profile |
 | Wrong profile loaded | Confirm `.env.Vitruvian` contains `VITRUVIAN_PROFILE=<name>` and that `.env.Vitruvian.<name>` exists |
 | Plugins not discovered | Ensure the DLLs are in a `plugins/` folder next to the running executable |
