@@ -210,11 +210,11 @@ When using `VITRUVIAN_MODEL_PROVIDER=OpenAI`, `ModelRequest.Tools` are forwarded
   - `require_approval` (`"always"`, `"never"`, or JSON object)
   - `allowed_tools` (CSV string or JSON array)
 
-### Current MCP approval limitation
+### MCP approvals with HITL
 
-If OpenAI returns an `mcp_approval_request`, Vitruvian currently throws a clear error. Interactive approval-response chaining (`mcp_approval_response`) is not implemented in the CLI integration yet.
+If OpenAI or Claude returns an `mcp_approval_request`, Vitruvian routes approval through the configured HITL approval gate (`IApprovalGate`) and sends `mcp_approval_response` when approved.
 
-For now, configure MCP tools with `require_approval: "never"` when using OpenAI from Vitruvian.
+If no approval gate is configured, Vitruvian throws a clear error indicating that MCP approval requires HITL configuration.
 
 ---
 
