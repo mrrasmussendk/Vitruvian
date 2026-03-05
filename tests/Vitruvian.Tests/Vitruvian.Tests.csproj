@@ -29,4 +29,8 @@
     <ProjectReference Include="..\..\src\Vitruvian.StandardModules\Vitruvian.StandardModules.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures\module-skill.md" />
+  </ItemGroup>
+
 </Project>

@@ -39,6 +39,51 @@ public static class ModuleSkillLoader
                 return File.ReadAllText(skillsPath);
         }
 
+        var embeddedSkill = TryLoadEmbeddedSkill(moduleType, fileName);
+        if (embeddedSkill is not null)
+            return embeddedSkill;
+
         return fallback;
+    }
+
+    private static string? TryLoadEmbeddedSkill(Type moduleType, string fileName)
+    {
+        var assembly = moduleType.Assembly;
+        var normalizedFileName = fileName.Replace('\\', '/').TrimStart('/');
+        var dottedFileName = normalizedFileName.Replace('/', '.');
+
+        var candidateNames = new[]
+        {
+            fileName,
+            normalizedFileName,
+            dottedFileName,
+            string.IsNullOrWhiteSpace(moduleType.Namespace) ? null : $"{moduleType.Namespace}.{dottedFileName}"
+        };
+
+        foreach (var candidateName in candidateNames.Where(static n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.Ordinal))
+        {
+            using var stream = assembly.GetManifestResourceStream(candidateName!);
+            if (stream is null)
+                continue;
+
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+
+        foreach (var resourceName in assembly.GetManifestResourceNames())
+        {
+            if (!resourceName.EndsWith($".{dottedFileName}", StringComparison.OrdinalIgnoreCase)
+                && !resourceName.Equals(dottedFileName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream is null)
+                continue;
+
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+
+        return null;
     }
 }
