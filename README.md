@@ -1,6 +1,8 @@
-# Vitruvian
+# Vitruvian — .NET GOAP Agent Runtime
 
-Vitruvian is a modular, GOAP-driven AI assistant framework built on .NET. It uses **Goal-Oriented Action Planning** to decompose user requests into dependency-aware execution plans, runs independent steps in parallel, and enforces human-in-the-loop approval, caching, and memory — all before any side-effecting action fires.
+**.NET GOAP agent runtime** that decomposes user requests into dependency-aware execution plans, runs independent steps in parallel, and enforces human-in-the-loop approval, caching, and memory — all before any side-effecting action fires.
+
+> **Vitruvian Agent Runtime** — modular, GOAP-driven AI agent orchestration for .NET.
 
 Third-party modules plug in via a single interface (`IVitruvianModule`). The host handles planning, routing, governance, and security so module authors focus only on capability logic.
 

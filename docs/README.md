@@ -1,6 +1,6 @@
-# Vitruvian Documentation
+# Vitruvian Agent Runtime — Documentation
 
-Welcome to the Vitruvian documentation. This folder contains detailed guides for every aspect of the framework. The root [README](../README.md) provides a quick-start overview; these pages go deeper.
+Welcome to the **Vitruvian Agent Runtime** documentation. This folder contains detailed guides for every aspect of the framework. The root [README](../README.md) provides a quick-start overview; these pages go deeper.
 
 ---
 

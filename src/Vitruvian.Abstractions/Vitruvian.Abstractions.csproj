@@ -7,7 +7,8 @@
     <Version>0.1.0</Version>
     <PackageId>Vitruvian.Abstractions</PackageId>
     <Authors>Vitruvian</Authors>
-    <Description>Core abstractions and interfaces for Vitruvian modules and runtime.</Description>
+    <Description>Core abstractions and interfaces for the Vitruvian Agent Runtime.</Description>
+    <PackageTags>dotnet;csharp;ai-agents;agent-framework;goap;planning;human-in-the-loop;tool-calling;orchestration</PackageTags>
     <RootNamespace>VitruvianAbstractions</RootNamespace>
   </PropertyGroup>
 

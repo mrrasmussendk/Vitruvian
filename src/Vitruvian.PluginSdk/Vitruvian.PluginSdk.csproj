@@ -11,7 +11,8 @@
     <Version>0.1.0</Version>
     <PackageId>Vitruvian.PluginSdk</PackageId>
     <Authors>Vitruvian</Authors>
-    <Description>SDK attributes and contracts for building Vitruvian modules.</Description>
+    <Description>SDK attributes and contracts for building Vitruvian Agent Runtime modules.</Description>
+    <PackageTags>dotnet;csharp;ai-agents;agent-framework;goap;planning;human-in-the-loop;tool-calling;orchestration</PackageTags>
     <RootNamespace>VitruvianPluginSdk</RootNamespace>
   </PropertyGroup>
 
