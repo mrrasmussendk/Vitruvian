@@ -1,4 +1,6 @@
+using VitruvianAbstractions;
 using VitruvianAbstractions.Interfaces;
+using VitruvianRuntime;
 using VitruvianStandardModules;
 using Xunit;
 
@@ -53,5 +55,13 @@ public sealed class ConversationModuleTests
         var result = await module.ExecuteAsync("hello", null, CancellationToken.None);
 
         Assert.Equal("Hello! How can I help?", result);
+    }
+
+    [Fact]
+    public void ConversationModule_DeclaresRequiresPermission()
+    {
+        var access = PermissionChecker.GetRequiredAccess(typeof(ConversationModule));
+
+        Assert.True(access.HasFlag(ModuleAccess.Read));
     }
 }
