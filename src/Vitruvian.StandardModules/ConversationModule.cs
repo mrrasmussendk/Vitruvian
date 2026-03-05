@@ -1,4 +1,6 @@
+using VitruvianAbstractions;
 using VitruvianAbstractions.Interfaces;
+using VitruvianPluginSdk.Attributes;
 
 namespace VitruvianStandardModules;
 
@@ -7,6 +9,7 @@ namespace VitruvianStandardModules;
 /// Handles general conversational requests using conversational AI.
 /// Acts as a fallback when no specialized module matches.
 /// </summary>
+[RequiresPermission(ModuleAccess.Read)]
 public sealed class ConversationModule : IVitruvianModule
 {
     private readonly IModelClient? _modelClient;
