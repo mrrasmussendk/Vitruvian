@@ -522,10 +522,11 @@ else
                         registeredCount++;
                 }
 
+                var summary = $"Loaded {registeredCount} module(s) from '{Path.GetFileName(normalizedPath)}'";
                 return Task.FromResult(
                     replacedCount > 0
-                        ? $"Loaded {registeredCount} module(s) from '{Path.GetFileName(normalizedPath)}' and replaced {replacedCount} existing registration(s). Use /unregister-module <domain> to remove debug modules."
-                        : $"Loaded {registeredCount} module(s) from '{Path.GetFileName(normalizedPath)}'. Use /unregister-module <domain> to remove debug modules.");
+                        ? $"{summary} and replaced {replacedCount} existing registration(s). Use /unregister-module <domain> to remove debug modules."
+                        : $"{summary}. Use /unregister-module <domain> to remove debug modules.");
             }
             catch (Exception ex)
             {

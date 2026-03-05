@@ -162,7 +162,7 @@ public sealed class CliHostedService : BackgroundService
     }
 
     /// <summary>
-    /// Parses `/load-module &lt;path-to-dll&gt;` into the module DLL path to load for local debugging.
+    /// Parses <c>/load-module path-to-dll</c> into the module DLL path to load for local debugging.
     /// </summary>
     internal static bool TryParseLoadModuleCommand(string input, out string modulePath)
     {
