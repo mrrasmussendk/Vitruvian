@@ -69,8 +69,8 @@ void PrintInstalledModules()
 
     Console.WriteLine($"Standard modules:{Environment.NewLine}  - {string.Join($"{Environment.NewLine}  - ", standardModules)}");
 
-    using var tempProvider = new ServiceCollection().BuildServiceProvider();
-    var installedModules = InstalledModuleLoader.LoadModulesWithSources(pluginsPath, tempProvider);
+    using var loaderServiceProvider = new ServiceCollection().BuildServiceProvider();
+    var installedModules = InstalledModuleLoader.LoadModulesWithSources(pluginsPath, loaderServiceProvider);
     var installedDlls = ModuleInstaller.ListInstalledModules(pluginsPath);
     if (installedDlls.Count == 0)
     {
@@ -91,7 +91,7 @@ void PrintInstalledModules()
             Console.WriteLine($"  - {dll}  (could not load)");
         }
 
-        Console.WriteLine("Use '/unregister-module <domain>' to remove.");
+        Console.WriteLine("Use '/unregister-module <domain or filename>' to remove.");
     }
 }
 
