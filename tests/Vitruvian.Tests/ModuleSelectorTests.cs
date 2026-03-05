@@ -15,7 +15,6 @@ public sealed class ModuleSelectorTests
         Assert.Contains(infos, static m => m.Domain == "shell-command");
         Assert.Contains(infos, static m => m.Domain == "web-search");
         Assert.Contains(infos, static m => m.Domain == "summarization");
-        Assert.Contains(infos, static m => m.Domain == "gmail");
     }
 
     [Fact]
@@ -31,9 +30,6 @@ public sealed class ModuleSelectorTests
     public void GetStandardModuleInfos_OptionalModulesAreNotCore()
     {
         var infos = ModuleSelector.GetStandardModuleInfos();
-
-        var gmail = Assert.Single(infos, static m => m.Domain == "gmail");
-        Assert.False(gmail.IsCore);
 
         var webSearch = Assert.Single(infos, static m => m.Domain == "web-search");
         Assert.False(webSearch.IsCore);

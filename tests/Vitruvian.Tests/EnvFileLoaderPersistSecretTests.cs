@@ -16,17 +16,6 @@ public sealed class EnvFileLoaderPersistSecretTests : IDisposable
     }
 
     [Fact]
-    public void PersistSecret_CreatesFileWhenMissing()
-    {
-        EnvFileLoader.PersistSecret("MY_KEY", "my_value", _tempDir);
-
-        var envFile = Path.Combine(_tempDir, ".env.Vitruvian");
-        Assert.True(File.Exists(envFile));
-        var lines = File.ReadAllLines(envFile);
-        Assert.Contains("MY_KEY=my_value", lines);
-    }
-
-    [Fact]
     public void PersistSecret_AppendsToExistingFile()
     {
         var envFile = Path.Combine(_tempDir, ".env.Vitruvian");

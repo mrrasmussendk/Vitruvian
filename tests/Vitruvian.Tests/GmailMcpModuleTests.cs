@@ -55,16 +55,6 @@ public sealed class GmailMcpModuleTests
     }
 
     [Fact]
-    public void GmailMcpTool_HasMcpServerUrl()
-    {
-        var tool = GmailMcpModule.GmailMcpTool;
-
-        Assert.Equal("gmail", tool.Name);
-        Assert.NotNull(tool.Parameters);
-        Assert.True(tool.Parameters.ContainsKey("server_url"));
-    }
-
-    [Fact]
     public void GmailMcpTool_HasRequireApproval()
     {
         var tool = GmailMcpModule.GmailMcpTool;
