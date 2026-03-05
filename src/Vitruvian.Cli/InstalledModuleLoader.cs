@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using VitruvianAbstractions;
 using VitruvianAbstractions.Interfaces;
 using VitruvianPluginSdk.Attributes;
 
@@ -57,7 +58,14 @@ public static class InstalledModuleLoader
             {
                 WarnOnMissingApiKeys(moduleType);
 
-                if (ActivatorUtilities.CreateInstance(services, moduleType) is IVitruvianModule module)
+                object? instance = RequiresCommandRunner(moduleType)
+                    ? ActivatorUtilities.CreateInstance(
+                        services,
+                        moduleType,
+                        services.GetService<ICommandRunner>() ?? new ProcessCommandRunner())
+                    : ActivatorUtilities.CreateInstance(services, moduleType);
+
+                if (instance is IVitruvianModule module)
                     modules.Add(module);
             }
             catch (Exception ex)
@@ -67,6 +75,14 @@ public static class InstalledModuleLoader
         }
 
         return modules;
+    }
+
+    private static bool RequiresCommandRunner(Type moduleType)
+    {
+        return moduleType
+            .GetConstructors()
+            .SelectMany(static ctor => ctor.GetParameters())
+            .Any(static parameter => parameter.ParameterType == typeof(ICommandRunner));
     }
 
     /// <summary>

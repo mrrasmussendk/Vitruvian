@@ -18,6 +18,16 @@ public sealed class InstalledModuleLoaderTests
     }
 
     [Fact]
+    public void CreateModulesFromAssembly_WithICommandRunnerDependency_UsesFallbackRunner()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+
+        var modules = InstalledModuleLoader.CreateModulesFromAssembly(typeof(InstalledModuleLoaderCommandRunnerModule).Assembly, provider);
+
+        Assert.Contains(modules, static module => module.GetType() == typeof(InstalledModuleLoaderCommandRunnerModule));
+    }
+
+    [Fact]
     public void LoadFromPluginsPath_WithMissingDirectory_ReturnsEmpty()
     {
         using var provider = new ServiceCollection().BuildServiceProvider();
@@ -96,4 +106,20 @@ public sealed class InstalledModuleLoaderTestModule : IVitruvianModule
 
     public Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
         => Task.FromResult("ok");
+}
+
+public sealed class InstalledModuleLoaderCommandRunnerModule : IVitruvianModule
+{
+    private readonly ICommandRunner _commandRunner;
+
+    public InstalledModuleLoaderCommandRunnerModule(ICommandRunner commandRunner)
+    {
+        _commandRunner = commandRunner;
+    }
+
+    public string Domain => "installed-loader-command-runner-test";
+    public string Description => "Installed loader command runner test module";
+
+    public Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
+        => Task.FromResult(_commandRunner.GetType().Name);
 }
