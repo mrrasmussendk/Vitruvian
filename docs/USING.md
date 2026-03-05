@@ -55,6 +55,8 @@ For more on the internals, see [ARCHITECTURE.md](ARCHITECTURE.md).
 | `/setup` | Run guided setup |
 | `/list-modules` | List all registered modules |
 | `/install-module <path>` | Install a plugin module from a DLL path |
+| `/load-module <path>` | Load a local module DLL for the current session (debugging) |
+| `/unregister-module <domain or filename>` | Unregister a module and remove installed plugin DLLs |
 | `/new-module <Name>` | Scaffold a new module project |
 | `quit` | Exit the CLI |
 
@@ -110,3 +112,15 @@ Install a plugin module interactively:
 ```
 
 If a plugin manifest includes `requiredSecrets`, Vitruvian prompts for missing values during interactive install. See [EXTENDING.md](EXTENDING.md) for how to build plugins.
+
+For local module debugging without installation, load the compiled DLL directly:
+
+```
+> /load-module /absolute/path/MyPlugin/bin/Debug/net8.0/MyPlugin.dll
+```
+
+When done, unregister it from the running session:
+
+```
+> /unregister-module my-plugin-domain
+```

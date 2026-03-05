@@ -17,6 +17,7 @@ public sealed class CliHostedService : BackgroundService
     private readonly Action _printCommands;
     private readonly Action _printInstalledModules;
     private readonly Func<string, bool, Task> _installModule;
+    private readonly Func<string, Task<string>> _loadModule;
     private readonly Func<string, bool> _unregisterModule;
     private readonly Func<string, string, string> _scaffoldModule;
     private readonly IHostApplicationLifetime _lifetime;
@@ -27,6 +28,7 @@ public sealed class CliHostedService : BackgroundService
         Action printCommands,
         Action printInstalledModules,
         Func<string, bool, Task> installModule,
+        Func<string, Task<string>> loadModule,
         Func<string, bool> unregisterModule,
         Func<string, string, string> scaffoldModule,
         IScheduledTaskStore? taskStore = null,
@@ -37,6 +39,7 @@ public sealed class CliHostedService : BackgroundService
         _printCommands = printCommands;
         _printInstalledModules = printInstalledModules;
         _installModule = installModule;
+        _loadModule = loadModule;
         _unregisterModule = unregisterModule;
         _scaffoldModule = scaffoldModule;
         _taskStore = taskStore;
@@ -91,6 +94,12 @@ public sealed class CliHostedService : BackgroundService
             if (ModuleInstaller.TryParseInstallCommand(input, out var moduleSpec, out var allowUnsigned))
             {
                 await _installModule(moduleSpec, allowUnsigned);
+                continue;
+            }
+
+            if (TryParseLoadModuleCommand(trimmed, out var modulePath))
+            {
+                Console.WriteLine($"  {await _loadModule(modulePath)}");
                 continue;
             }
 
@@ -150,6 +159,20 @@ public sealed class CliHostedService : BackgroundService
 
         domain = input["/unregister-module ".Length..].Trim();
         return !string.IsNullOrWhiteSpace(domain);
+    }
+
+    /// <summary>
+    /// Parses `/load-module &lt;path-to-dll&gt;` into the module DLL path to load for local debugging.
+    /// </summary>
+    internal static bool TryParseLoadModuleCommand(string input, out string modulePath)
+    {
+        modulePath = string.Empty;
+
+        if (!input.StartsWith("/load-module ", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        modulePath = input["/load-module ".Length..].Trim();
+        return !string.IsNullOrWhiteSpace(modulePath);
     }
 
     /// <summary>
