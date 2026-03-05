@@ -51,6 +51,42 @@ public sealed class InstalledModuleLoaderTests
                 Directory.Delete(pluginsPath, recursive: true);
         }
     }
+
+    [Fact]
+    public void LoadModulesWithSources_WithMissingDirectory_ReturnsEmpty()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var pluginsPath = Path.Combine(Path.GetTempPath(), $"vitruvian-missing-plugins-{Guid.NewGuid():N}");
+
+        var modules = InstalledModuleLoader.LoadModulesWithSources(pluginsPath, provider);
+
+        Assert.Empty(modules);
+    }
+
+    [Fact]
+    public void LoadModulesWithSources_WithPluginAssembly_ReturnsDllPath()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        var pluginsPath = Path.Combine(Path.GetTempPath(), $"vitruvian-plugins-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(pluginsPath);
+
+        try
+        {
+            var sourceAssemblyPath = typeof(InstalledModuleLoaderTestModule).Assembly.Location;
+            var destinationAssemblyPath = Path.Combine(pluginsPath, "InstalledModuleLoaderTestPlugin.dll");
+            File.Copy(sourceAssemblyPath, destinationAssemblyPath, overwrite: true);
+
+            var modules = InstalledModuleLoader.LoadModulesWithSources(pluginsPath, provider);
+
+            var match = Assert.Single(modules, m => m.Module.GetType() == typeof(InstalledModuleLoaderTestModule));
+            Assert.Equal(Path.GetFullPath(destinationAssemblyPath), match.SourceDllPath);
+        }
+        finally
+        {
+            if (Directory.Exists(pluginsPath))
+                Directory.Delete(pluginsPath, recursive: true);
+        }
+    }
 }
 
 public sealed class InstalledModuleLoaderTestModule : IVitruvianModule

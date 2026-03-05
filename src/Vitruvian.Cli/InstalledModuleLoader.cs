@@ -9,16 +9,32 @@ public static class InstalledModuleLoader
 {
     public static IReadOnlyList<IVitruvianModule> LoadFromPluginsPath(string pluginsPath, IServiceProvider services)
     {
+        return LoadModulesWithSources(pluginsPath, services)
+            .Select(static pair => pair.Module)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Loads all plugin modules from the given directory and returns each module
+    /// together with the absolute path of the source DLL it was loaded from.
+    /// </summary>
+    public static IReadOnlyList<(IVitruvianModule Module, string SourceDllPath)> LoadModulesWithSources(
+        string pluginsPath, IServiceProvider services)
+    {
         if (!Directory.Exists(pluginsPath))
             return [];
 
-        var modules = new List<IVitruvianModule>();
+        var modules = new List<(IVitruvianModule, string)>();
         foreach (var dllPath in Directory.EnumerateFiles(pluginsPath, "*.dll", SearchOption.TopDirectoryOnly))
         {
             try
             {
-                var assembly = Assembly.LoadFrom(dllPath);
-                modules.AddRange(CreateModulesFromAssembly(assembly, services));
+                var fullPath = Path.GetFullPath(dllPath);
+                var assembly = Assembly.LoadFrom(fullPath);
+                foreach (var module in CreateModulesFromAssembly(assembly, services))
+                {
+                    modules.Add((module, fullPath));
+                }
             }
             catch (Exception ex)
             {
