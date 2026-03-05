@@ -9,7 +9,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.2.4</Version>
+    <Version>1.2.5</Version>
     <PackageId>Vitruvian.WeatherModule</PackageId>
     <Description>Vitruvian Agent Runtime plugin module that fetches current weather data from the web.</Description>
     <PackageTags>dotnet;csharp;ai-agents;agent-framework;goap;planning;human-in-the-loop;tool-calling;orchestration</PackageTags>
