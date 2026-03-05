@@ -203,7 +203,8 @@ public static class ModelClientStructuredOutputExtensions
         if (dictionaryType is null)
             return false;
 
-        valueType = Nullable.GetUnderlyingType(dictionaryType.GetGenericArguments()[1]) ?? dictionaryType.GetGenericArguments()[1];
+        var genericValueType = dictionaryType.GetGenericArguments()[1];
+        valueType = Nullable.GetUnderlyingType(genericValueType) ?? genericValueType;
         return true;
     }
 
