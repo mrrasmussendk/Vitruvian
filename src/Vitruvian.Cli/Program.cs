@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using VitruvianAbstractions;
 using VitruvianCli;
 using VitruvianRuntime;
 using VitruvianRuntime.Routing;
@@ -352,6 +353,7 @@ IModelClient? modelClient = modelConfiguration is not null
     : null;
 if (modelClient is not null)
     builder.Services.AddSingleton<IModelClient>(modelClient);
+builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 
 // Register modules
 builder.Services.AddSingleton<IVitruvianModule>(sp =>
@@ -365,7 +367,10 @@ builder.Services.AddSingleton<IVitruvianModule>(sp =>
 builder.Services.AddSingleton<IVitruvianModule>(sp =>
     new GmailModule(sp.GetService<IModelClient>()));
 builder.Services.AddSingleton<IVitruvianModule>(sp =>
-    new ShellCommandModule(sp.GetService<IModelClient>(), workingDirectory));
+    new ShellCommandModule(
+        sp.GetService<IModelClient>(),
+        workingDirectory,
+        commandRunner: sp.GetRequiredService<ICommandRunner>()));
 
 // Register module router with configuration options
 builder.Services.AddSingleton<ModuleRouter>(sp =>

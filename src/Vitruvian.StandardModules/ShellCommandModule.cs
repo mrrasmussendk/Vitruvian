@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using VitruvianAbstractions;
 using VitruvianAbstractions.Interfaces;
@@ -79,6 +78,7 @@ IMPORTANT: This system is running Unix/Linux/macOS. Use Unix-native commands:
         ];
 
     private readonly IModelClient? _modelClient;
+    private readonly ICommandRunner _commandRunner;
     private readonly string _workingDirectory;
     private readonly HashSet<string> _allowedCommands;
 
@@ -90,9 +90,11 @@ IMPORTANT: This system is running Unix/Linux/macOS. Use Unix-native commands:
     public ShellCommandModule(
         IModelClient? modelClient = null,
         string? workingDirectory = null,
-        IEnumerable<string>? allowedCommands = null)
+        IEnumerable<string>? allowedCommands = null,
+        ICommandRunner? commandRunner = null)
     {
         _modelClient = modelClient;
+        _commandRunner = commandRunner ?? new ProcessCommandRunner();
         _workingDirectory = workingDirectory ?? Directory.GetCurrentDirectory();
         _allowedCommands = new HashSet<string>(
             allowedCommands ?? LoadAllowedCommandsFromEnvironment(),
@@ -192,61 +194,27 @@ IMPORTANT: This system is running Unix/Linux/macOS. Use Unix-native commands:
 
     private async Task<string> ExecuteCommandAsync(CommandInvocation invocation, CancellationToken ct)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = invocation.Command,
-                WorkingDirectory = _workingDirectory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
+        var result = await _commandRunner.ExecuteAsync(
+            invocation.Command,
+            invocation.Args,
+            _workingDirectory,
+            CommandTimeout,
+            ct);
 
-        foreach (var arg in invocation.Args)
-        {
-            process.StartInfo.ArgumentList.Add(arg);
-        }
+        if (!string.IsNullOrWhiteSpace(result.StartError))
+            return $"Failed to start command '{invocation.Command}': {result.StartError}";
 
-        try
-        {
-            process.Start();
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            return $"Failed to start command '{invocation.Command}': {ex.Message}";
-        }
+        if (result.TimedOut)
+            return $"Command timed out after {CommandTimeout.TotalSeconds:0} seconds.";
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(CommandTimeout);
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-        var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
-
-        try
-        {
-            await process.WaitForExitAsync(timeoutCts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            if (!ct.IsCancellationRequested && !process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                return $"Command timed out after {CommandTimeout.TotalSeconds:0} seconds.";
-            }
-
-            throw;
-        }
-
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-        var combined = string.IsNullOrWhiteSpace(stderr) ? stdout : $"{stdout}\n{stderr}";
+        var combined = string.IsNullOrWhiteSpace(result.StandardError)
+            ? result.StandardOutput
+            : $"{result.StandardOutput}\n{result.StandardError}";
         var trimmed = combined.Trim();
         if (trimmed.Length > MaxOutputLength)
             trimmed = $"{trimmed[..MaxOutputLength]}\n...[output truncated]";
 
-        return $"ExitCode: {process.ExitCode}\n{(string.IsNullOrWhiteSpace(trimmed) ? "(no output)" : trimmed)}";
+        return $"ExitCode: {result.ExitCode ?? -1}\n{(string.IsNullOrWhiteSpace(trimmed) ? "(no output)" : trimmed)}";
     }
 
     private static IEnumerable<string> LoadAllowedCommandsFromEnvironment()

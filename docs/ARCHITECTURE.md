@@ -9,6 +9,7 @@ Vitruvian uses a **Goal-Oriented Action Planning (GOAP)** architecture. Every us
 - [GOAP Pipeline](#goap-pipeline)
 - [Key Components](#key-components)
   - [IVitruvianModule](#ivitruvianmodule--the-module-contract)
+  - [ICommandRunner](#icommandrunner--shared-command-execution)
   - [GoapPlanner](#goapplanner--plan-before-you-execute)
   - [PlanExecutor](#planexecutor--parallel-governed-execution)
   - [RequestProcessor](#requestprocessor--the-orchestrator)
@@ -69,6 +70,10 @@ public interface IVitruvianModule
 ```
 
 The `Domain` string is used by the planner to assign steps to modules. The `Description` is shown to the LLM so it can reason about which module handles a given sub-task.
+
+### `ICommandRunner` — Shared Command Execution
+
+Modules that need to spawn external processes use the shared `ICommandRunner` abstraction from `Vitruvian.Abstractions`. The default implementation, `ProcessCommandRunner`, centralizes process start, output capture, timeout handling, and cancellation behavior so both built-in modules and external plugin DLL modules can reuse the same execution path.
 
 ### `GoapPlanner` — Plan Before You Execute
 

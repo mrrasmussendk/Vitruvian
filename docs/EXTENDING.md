@@ -194,3 +194,21 @@ cp bin/Release/net8.0/publish/* \
 | **Keep `ExecuteAsync` focused** | One responsibility per module. The GOAP planner handles orchestration across modules. |
 | **Declare permissions** | Use `[RequiresPermission]` to declare what access your module needs. The runtime enforces this before execution. |
 | **Declare external secrets** | Use `[RequiresApiKey("MY_API_KEY")]` (repeatable) so the installer can prompt for missing keys at install time. |
+| **Use `ICommandRunner` for process execution** | For modules that run commands, depend on `ICommandRunner` and use the shared `ProcessCommandRunner` implementation instead of creating your own `Process` logic. |
+
+For command-executing modules, inject and use the shared command runner abstraction:
+
+```csharp
+using VitruvianAbstractions;
+using VitruvianAbstractions.Interfaces;
+
+public sealed class MyCommandModule : IVitruvianModule
+{
+    private readonly ICommandRunner _commandRunner;
+
+    public MyCommandModule(ICommandRunner? commandRunner = null)
+    {
+        _commandRunner = commandRunner ?? new ProcessCommandRunner();
+    }
+}
+```

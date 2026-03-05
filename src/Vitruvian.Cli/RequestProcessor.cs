@@ -120,7 +120,10 @@ public sealed class RequestProcessor
             WebSearchModule _ => new WebSearchModule(contextAwareClient),
             SummarizationModule _ => new SummarizationModule(contextAwareClient),
             GmailModule _ => new GmailModule(contextAwareClient),
-            ShellCommandModule _ => new ShellCommandModule(contextAwareClient, GetDefaultWorkingDirectory()),
+            ShellCommandModule _ => new ShellCommandModule(
+                contextAwareClient,
+                GetDefaultWorkingDirectory(),
+                commandRunner: _host.Services.GetRequiredService<ICommandRunner>()),
             FileOperationsModule fileModule => new FileOperationsModule(contextAwareClient, GetDefaultWorkingDirectory()),
             _ => module // Return original if we don't know how to wrap it
         };
