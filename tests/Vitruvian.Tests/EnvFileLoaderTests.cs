@@ -3,12 +3,12 @@ using Xunit;
 
 namespace VitruvianTests;
 
-public sealed class EnvFileLoaderProfileTests : IDisposable
+public sealed class EnvFileLoaderTests : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"vitruvian-env-profile-{Guid.NewGuid():N}");
     private readonly Dictionary<string, string?> _originalValues = new(StringComparer.Ordinal);
 
-    public EnvFileLoaderProfileTests() => Directory.CreateDirectory(_tempDir);
+    public EnvFileLoaderTests() => Directory.CreateDirectory(_tempDir);
 
     [Fact]
     public void Load_LoadsActiveProfileFromDottedFile()
