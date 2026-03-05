@@ -197,6 +197,27 @@ See [docs/INSTALL.md](docs/INSTALL.md) for the full variable reference and profi
 
 ---
 
+## OpenAI Responses Tools and MCP
+
+When using `VITRUVIAN_MODEL_PROVIDER=OpenAI`, `ModelRequest.Tools` are forwarded to the OpenAI `/v1/responses` payload:
+
+- Non-MCP tools are sent as OpenAI `function` tools with JSON Schema generated from `ModelTool.Parameters`.
+- MCP tools are sent as OpenAI `mcp` tools and support:
+  - `server_url` (remote MCP server)
+  - `connector_id` (OpenAI connector)
+  - `server_label` / `server_description`
+  - `authorization`
+  - `require_approval` (`"always"`, `"never"`, or JSON object)
+  - `allowed_tools` (CSV string or JSON array)
+
+### Current MCP approval limitation
+
+If OpenAI returns an `mcp_approval_request`, Vitruvian currently throws a clear error. Interactive approval-response chaining (`mcp_approval_response`) is not implemented in the CLI integration yet.
+
+For now, configure MCP tools with `require_approval: "never"` when using OpenAI from Vitruvian.
+
+---
+
 ## Contributing
 
 Contributions welcome! See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
