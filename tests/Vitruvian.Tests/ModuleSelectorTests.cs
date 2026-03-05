@@ -183,7 +183,7 @@ public sealed class ModuleSelectorTests
     }
 
     [Fact]
-    public void GetDomainFromType_WithCapabilityAttribute_ReturnsDomain()
+    public void GetDomainFromType_WithoutCapabilityAttribute_ReturnsKebabCase()
     {
         // InstalledModuleLoaderTestModule doesn't have the attribute — falls back to kebab-case
         var domain = ModuleSelector.GetDomainFromType(typeof(InstalledModuleLoaderTestModule));

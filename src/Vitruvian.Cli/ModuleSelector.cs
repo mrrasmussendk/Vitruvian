@@ -235,10 +235,8 @@ public static class ModuleSelector
     internal static string GetDescriptionFromType(Type moduleType)
     {
         var cap = moduleType.GetCustomAttribute<VitruvianCapabilityAttribute>();
-        if (cap is not null && !string.IsNullOrWhiteSpace(cap.Domain))
-        {
-            // Use domain as a fallback description
-        }
+        if (cap is not null && !string.IsNullOrWhiteSpace(cap.Description))
+            return cap.Description;
 
         return $"{moduleType.Name} module";
     }
