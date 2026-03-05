@@ -323,8 +323,15 @@ file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpCl
 
         if (normalized.StartsWith('{') || normalized.StartsWith('['))
         {
-            using var parsed = JsonDocument.Parse(normalized);
-            return parsed.RootElement.Clone();
+            try
+            {
+                using var parsed = JsonDocument.Parse(normalized);
+                return parsed.RootElement.Clone();
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidOperationException("Invalid MCP require_approval JSON payload.", ex);
+            }
         }
 
         return normalized;
@@ -335,15 +342,22 @@ file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpCl
         var normalized = value.Trim();
         if (normalized.StartsWith('['))
         {
-            using var parsed = JsonDocument.Parse(normalized);
-            return parsed.RootElement.ValueKind == JsonValueKind.Array
-                ? parsed.RootElement.EnumerateArray()
-                    .Where(element => element.ValueKind == JsonValueKind.String)
-                    .Select(element => element.GetString())
-                    .Where(static element => !string.IsNullOrWhiteSpace(element))
-                    .Cast<string>()
-                    .ToArray()
-                : [];
+            try
+            {
+                using var parsed = JsonDocument.Parse(normalized);
+                return parsed.RootElement.ValueKind == JsonValueKind.Array
+                    ? parsed.RootElement.EnumerateArray()
+                        .Where(element => element.ValueKind == JsonValueKind.String)
+                        .Select(element => element.GetString())
+                        .OfType<string>()
+                        .Where(static element => !string.IsNullOrWhiteSpace(element))
+                        .ToArray()
+                    : [];
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidOperationException("Invalid MCP allowed_tools JSON payload.", ex);
+            }
         }
 
         return normalized
