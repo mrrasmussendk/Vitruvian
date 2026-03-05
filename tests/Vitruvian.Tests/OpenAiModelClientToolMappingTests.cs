@@ -208,7 +208,7 @@ public sealed class OpenAiModelClientToolMappingTests
 
         public CapturingHttpMessageHandler(params string[] responsePayloads)
         {
-            if (responsePayloads is null || responsePayloads.Length == 0)
+            if (responsePayloads.Length == 0)
                 throw new ArgumentException("At least one response payload is required.", nameof(responsePayloads));
 
             _responsePayloads = new Queue<string>(responsePayloads);

@@ -9,6 +9,7 @@ namespace VitruvianCli;
 internal static class IntegrationDefaults
 {
     public const int DefaultModelMaxTokens = 512;
+    public const int MaxMcpApprovalRounds = 5;
     public const int DefaultDiscordPollIntervalSeconds = 2;
     public const int DefaultDiscordMessageLimit = 25;
     public const int MaxDiscordMessageLimit = 100;
@@ -106,8 +107,6 @@ public static class ModelClientFactory
 
 file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpClient, IApprovalGate? approvalGate = null) : IModelClient
 {
-    private const int MaxMcpApprovalRounds = 5;
-
     public async Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken)
     {
         var response = await GenerateAsync(new ModelRequest { Prompt = prompt }, cancellationToken);
@@ -133,7 +132,7 @@ file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpCl
             var previousResponseId = default(string);
             List<object>? followUpInput = null;
 
-            for (var approvalRound = 0; approvalRound <= MaxMcpApprovalRounds; approvalRound++)
+            for (var approvalRound = 0; approvalRound < IntegrationDefaults.MaxMcpApprovalRounds; approvalRound++)
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.ApiKey);
@@ -433,8 +432,6 @@ file sealed class OpenAiModelClient(ModelConfiguration config, HttpClient httpCl
 
 file sealed class AnthropicModelClient(ModelConfiguration config, HttpClient httpClient, IApprovalGate? approvalGate = null) : IModelClient
 {
-    private const int MaxMcpApprovalRounds = 5;
-
     public async Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken)
     {
         var response = await GenerateAsync(new ModelRequest { Prompt = prompt }, cancellationToken);
@@ -470,7 +467,7 @@ file sealed class AnthropicModelClient(ModelConfiguration config, HttpClient htt
                 }
             };
 
-            for (var approvalRound = 0; approvalRound <= MaxMcpApprovalRounds; approvalRound++)
+            for (var approvalRound = 0; approvalRound < IntegrationDefaults.MaxMcpApprovalRounds; approvalRound++)
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
                 request.Headers.Add("x-api-key", config.ApiKey);
@@ -527,8 +524,7 @@ file sealed class AnthropicModelClient(ModelConfiguration config, HttpClient htt
                     if (!approvalRequest.TryGetProperty("id", out var approvalIdElement) || string.IsNullOrWhiteSpace(approvalIdElement.GetString()))
                         throw new InvalidOperationException("Claude MCP approval request did not include an approval id.");
 
-                    var approvalRequestObject = JsonSerializer.Deserialize<object>(approvalRequest.GetRawText())
-                        ?? throw new InvalidOperationException("Claude MCP approval request payload could not be parsed.");
+                    var approvalRequestObject = approvalRequest.Clone();
                     messages.Add(new Dictionary<string, object>
                     {
                         ["role"] = "assistant",
