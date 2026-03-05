@@ -197,6 +197,27 @@ See [docs/INSTALL.md](docs/INSTALL.md) for the full variable reference and profi
 
 ---
 
+## OpenAI Responses Tools and MCP
+
+When using `VITRUVIAN_MODEL_PROVIDER=OpenAI`, `ModelRequest.Tools` are forwarded to the OpenAI `/v1/responses` payload:
+
+- Non-MCP tools are sent as OpenAI `function` tools with JSON Schema generated from `ModelTool.Parameters`.
+- MCP tools are sent as OpenAI `mcp` tools and support:
+  - `server_url` (remote MCP server)
+  - `connector_id` (OpenAI connector)
+  - `server_label` / `server_description`
+  - `authorization`
+  - `require_approval` (`"always"`, `"never"`, or JSON object)
+  - `allowed_tools` (CSV string or JSON array)
+
+### MCP approvals with HITL
+
+If OpenAI or Claude returns an `mcp_approval_request`, Vitruvian routes approval through the configured HITL approval gate (`IApprovalGate`) and sends `mcp_approval_response` when approved.
+
+If no approval gate is configured, Vitruvian throws a clear error indicating that MCP approval requires HITL configuration.
+
+---
+
 ## Contributing
 
 Contributions welcome! See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.

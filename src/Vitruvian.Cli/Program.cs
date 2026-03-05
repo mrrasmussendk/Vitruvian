@@ -348,8 +348,9 @@ builder.Services.AddUtilityAiVitruvian(opts =>
 // Register the host-level model client so plugins receive it via DI.
 // The concrete provider (OpenAI, Anthropic, Gemini) is chosen by env config.
 var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+var approvalGate = new VitruvianHitl.ConsoleApprovalGate(timeout: TimeSpan.FromSeconds(30));
 IModelClient? modelClient = modelConfiguration is not null
-    ? ModelClientFactory.Create(modelConfiguration, httpClient)
+    ? ModelClientFactory.Create(modelConfiguration, httpClient, approvalGate)
     : null;
 if (modelClient is not null)
     builder.Services.AddSingleton<IModelClient>(modelClient);
@@ -383,7 +384,6 @@ var host = builder.Build();
 
 // Create and configure the request processor
 var router = host.Services.GetRequiredService<ModuleRouter>();
-var approvalGate = new VitruvianHitl.ConsoleApprovalGate(timeout: TimeSpan.FromSeconds(30));
 var requestProcessor = new RequestProcessor(host, router, modelClient, approvalGate);
 
 // Register all modules with the router
