@@ -20,6 +20,7 @@ public sealed class CliHostedService : BackgroundService
     private readonly Func<string, Task<string>> _loadModule;
     private readonly Func<string, bool> _unregisterModule;
     private readonly Func<string, string, string> _scaffoldModule;
+    private readonly Action? _configureModules;
     private readonly IHostApplicationLifetime _lifetime;
 
     public CliHostedService(
@@ -32,7 +33,8 @@ public sealed class CliHostedService : BackgroundService
         Func<string, bool> unregisterModule,
         Func<string, string, string> scaffoldModule,
         IScheduledTaskStore? taskStore = null,
-        NaturalLanguageScheduleParser? scheduleParser = null)
+        NaturalLanguageScheduleParser? scheduleParser = null,
+        Action? configureModules = null)
     {
         _requestProcessor = requestProcessor;
         _lifetime = lifetime;
@@ -44,6 +46,7 @@ public sealed class CliHostedService : BackgroundService
         _scaffoldModule = scaffoldModule;
         _taskStore = taskStore;
         _scheduleParser = scheduleParser;
+        _configureModules = configureModules;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,6 +79,15 @@ public sealed class CliHostedService : BackgroundService
             if (string.Equals(trimmed, "/list-modules", StringComparison.OrdinalIgnoreCase))
             {
                 _printInstalledModules();
+                continue;
+            }
+
+            if (string.Equals(trimmed, "/configure-modules", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_configureModules is not null)
+                    _configureModules();
+                else
+                    Console.WriteLine("  Module configuration is not available. Use '--configure-modules' at startup.");
                 continue;
             }
 
