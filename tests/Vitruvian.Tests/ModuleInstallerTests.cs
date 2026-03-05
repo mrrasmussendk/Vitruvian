@@ -73,6 +73,8 @@ public sealed class ModuleInstallerTests
             var readmeContents = File.ReadAllText(readmePath);
             Assert.Contains("vitruvian-manifest.json", readmeContents);
             Assert.Contains("bin/Debug/net", readmeContents);
+            Assert.Contains("/load-module", readmeContents);
+            Assert.Contains("/unregister-module", readmeContents);
             Assert.DoesNotContain("bin/Debug/net10.0", readmeContents);
             Assert.DoesNotContain("Vitruvian-manifest.json", readmeContents);
         }

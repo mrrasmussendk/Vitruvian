@@ -55,4 +55,28 @@ public sealed class CliHostedServiceTests
 
         Assert.False(result);
     }
+
+    [Theory]
+    [InlineData("/load-module /tmp/MyModule.dll", "/tmp/MyModule.dll")]
+    [InlineData("/load-module  C:\\dev\\MyModule.dll ", "C:\\dev\\MyModule.dll")]
+    [InlineData("/LOAD-MODULE ./bin/Debug/net8.0/MyModule.dll", "./bin/Debug/net8.0/MyModule.dll")]
+    public void TryParseLoadModuleCommand_ValidInput_ReturnsTrue(string input, string expectedPath)
+    {
+        var result = CliHostedService.TryParseLoadModuleCommand(input, out var modulePath);
+
+        Assert.True(result);
+        Assert.Equal(expectedPath, modulePath);
+    }
+
+    [Theory]
+    [InlineData("/load-module")]
+    [InlineData("/load-module ")]
+    [InlineData("/help")]
+    [InlineData("load-module /tmp/MyModule.dll")] // missing /
+    public void TryParseLoadModuleCommand_InvalidInput_ReturnsFalse(string input)
+    {
+        var result = CliHostedService.TryParseLoadModuleCommand(input, out _);
+
+        Assert.False(result);
+    }
 }

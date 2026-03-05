@@ -19,7 +19,7 @@ using VitruvianStandardModules;
 EnvFileLoader.Load(overwriteExisting: true);
 
 var pluginsPath = Path.Combine(AppContext.BaseDirectory, "plugins");
-void PrintCommands() => Console.WriteLine("Commands: /help, /setup, /list-modules, /install-module <path|package@version> [--allow-unsigned], /unregister-module <domain>, /inspect-module <path|package@version> [--json], /doctor [--json], /policy validate <policyFile>, /policy explain <request>, /audit list, /audit show <id> [--json], /replay <id> [--no-exec], /new-module <Name> [OutputPath], /schedule \"<interval>\" <request>, /list-tasks, /cancel-task <id>, quit");
+void PrintCommands() => Console.WriteLine("Commands: /help, /setup, /list-modules, /install-module <path|package@version> [--allow-unsigned], /load-module <path-to-dll>, /unregister-module <domain|filename>, /inspect-module <path|package@version> [--json], /doctor [--json], /policy validate <policyFile>, /policy explain <request>, /audit list, /audit show <id> [--json], /replay <id> [--no-exec], /new-module <Name> [OutputPath], /schedule \"<interval>\" <request>, /list-tasks, /cancel-task <id>, quit");
 string? PromptForSecret(string secretName)
 {
     Console.Write($"Missing required secret '{secretName}'. Enter value (blank will fail install): ");
@@ -392,12 +392,12 @@ foreach (var module in host.Services.GetServices<IVitruvianModule>())
     requestProcessor.RegisterModule(module);
 }
 
-// Track which DLL each plugin module was loaded from so we can delete it on unregister
-var pluginSources = new Dictionary<string, string>();
+// Track which DLL each plugin module was loaded from and whether it should be deleted on unregister.
+var pluginSources = new Dictionary<string, (string SourceDllPath, bool DeleteOnUnregister)>();
 foreach (var (module, sourceDllPath) in InstalledModuleLoader.LoadModulesWithSources(pluginsPath, host.Services))
 {
     requestProcessor.RegisterModule(module);
-    pluginSources[module.Domain] = sourceDllPath;
+    pluginSources[module.Domain] = (sourceDllPath, DeleteOnUnregister: true);
 }
 
 var discordToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
@@ -481,7 +481,7 @@ else
                     if (!requestProcessor.IsModuleRegistered(module.Domain))
                     {
                         requestProcessor.RegisterModule(module);
-                        pluginSources[module.Domain] = sourceDllPath;
+                        pluginSources[module.Domain] = (sourceDllPath, DeleteOnUnregister: true);
                         registered++;
                     }
                 }
@@ -491,14 +491,56 @@ else
                     : "  Module(s) loaded and ready to use.");
             }
         },
+        modulePath =>
+        {
+            if (string.IsNullOrWhiteSpace(modulePath))
+                return Task.FromResult("Load failed: provide a path to a module DLL.");
+
+            var normalizedPath = Path.GetFullPath(modulePath.Trim());
+            if (!File.Exists(normalizedPath))
+                return Task.FromResult($"Load failed: '{normalizedPath}' does not exist.");
+            if (!normalizedPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult("Load failed: only .dll files can be loaded with /load-module.");
+
+            try
+            {
+                var assembly = Assembly.LoadFrom(normalizedPath);
+                var loadedModules = InstalledModuleLoader.CreateModulesFromAssembly(assembly, host.Services);
+                if (loadedModules.Count == 0)
+                    return Task.FromResult($"Load failed: '{Path.GetFileName(normalizedPath)}' does not export an IVitruvianModule.");
+
+                var registeredCount = 0;
+                var replacedCount = 0;
+                foreach (var module in loadedModules)
+                {
+                    var wasRegistered = requestProcessor.IsModuleRegistered(module.Domain);
+                    requestProcessor.RegisterModule(module);
+                    pluginSources[module.Domain] = (normalizedPath, DeleteOnUnregister: false);
+                    if (wasRegistered)
+                        replacedCount++;
+                    else
+                        registeredCount++;
+                }
+
+                var summary = $"Loaded {registeredCount} module(s) from '{Path.GetFileName(normalizedPath)}'";
+                return Task.FromResult(
+                    replacedCount > 0
+                        ? $"{summary} and replaced {replacedCount} existing registration(s). Use /unregister-module <domain> to remove debug modules."
+                        : $"{summary}. Use /unregister-module <domain> to remove debug modules.");
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult($"Load failed: {ex.Message}");
+            }
+        },
         domain =>
         {
             // If the user typed a DLL filename instead of a domain, resolve it
             if (!requestProcessor.IsModuleRegistered(domain))
             {
                 var match = pluginSources.FirstOrDefault(kvp =>
-                    string.Equals(Path.GetFileName(kvp.Value), domain, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(Path.GetFileNameWithoutExtension(kvp.Value), domain, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(Path.GetFileName(kvp.Value.SourceDllPath), domain, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Path.GetFileNameWithoutExtension(kvp.Value.SourceDllPath), domain, StringComparison.OrdinalIgnoreCase));
                 if (match.Key is not null)
                     domain = match.Key;
             }
@@ -513,7 +555,7 @@ else
 
                 // Unregister any other modules that were loaded from the same DLL
                 var coLocated = pluginSources
-                    .Where(kvp => string.Equals(kvp.Value, dllPath, StringComparison.OrdinalIgnoreCase))
+                    .Where(kvp => string.Equals(kvp.Value.SourceDllPath, dllPath.SourceDllPath, StringComparison.OrdinalIgnoreCase))
                     .Select(kvp => kvp.Key)
                     .ToList();
                 foreach (var co in coLocated)
@@ -523,13 +565,16 @@ else
                     pluginSources.Remove(co);
                 }
 
+                if (!dllPath.DeleteOnUnregister)
+                    return true;
+
                 try
                 {
-                    File.Delete(dllPath);
+                    File.Delete(dllPath.SourceDllPath);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"  [WARN] Could not delete plugin DLL '{Path.GetFileName(dllPath)}': {ex.Message}");
+                    Console.WriteLine($"  [WARN] Could not delete plugin DLL '{Path.GetFileName(dllPath.SourceDllPath)}': {ex.Message}");
                 }
             }
 

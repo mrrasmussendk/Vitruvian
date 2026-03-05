@@ -335,7 +335,20 @@ public static class ModuleInstaller
 
             ## Testing Locally
 
-            ### Option 1: Install the DLL
+            ### Option 1: Load directly for local debugging (no install)
+
+            ```bash
+            # Build the module
+            dotnet build
+
+            # In a running Vitruvian CLI session, load your local build output
+            /load-module ./bin/Debug/{{scaffoldTargetFramework}}/{{moduleName}}.dll
+
+            # Remove it again when iterating
+            /unregister-module {{domainId}}
+            ```
+
+            ### Option 2: Install the DLL
 
             ```bash
             # Build in Release mode
@@ -345,7 +358,7 @@ public static class ModuleInstaller
             vitruvian --install-module ./bin/Release/{{scaffoldTargetFramework}}/{{moduleName}}.dll --allow-unsigned
             ```
 
-            ### Option 2: Copy to plugins folder
+            ### Option 3: Copy to plugins folder
 
             ```bash
             # Build the module
