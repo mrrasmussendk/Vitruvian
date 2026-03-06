@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using VitruvianAbstractions;
 using VitruvianAbstractions.Interfaces;
 using VitruvianCli;
 using Xunit;
@@ -7,6 +8,8 @@ namespace VitruvianTests;
 
 public sealed class InstalledModuleLoaderTests
 {
+    private const string IgnoredRequest = "ignored";
+
     [Fact]
     public void CreateModulesFromAssembly_WithVitruvianModuleType_CreatesModuleInstance()
     {
@@ -15,6 +18,19 @@ public sealed class InstalledModuleLoaderTests
         var modules = InstalledModuleLoader.CreateModulesFromAssembly(typeof(InstalledModuleLoaderTestModule).Assembly, provider);
 
         Assert.Contains(modules, static module => module.GetType() == typeof(InstalledModuleLoaderTestModule));
+    }
+
+    [Fact]
+    public async Task CreateModulesFromAssembly_WithICommandRunnerDependency_UsesFallbackRunner()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+
+        var modules = InstalledModuleLoader.CreateModulesFromAssembly(typeof(InstalledModuleLoaderCommandRunnerModule).Assembly, provider);
+
+        var module = Assert.IsType<InstalledModuleLoaderCommandRunnerModule>(
+            Assert.Single(modules, static loadedModule => loadedModule.GetType() == typeof(InstalledModuleLoaderCommandRunnerModule)));
+        var returnedTypeName = await module.ExecuteAsync(IgnoredRequest, userId: null, CancellationToken.None);
+        Assert.Equal(nameof(ProcessCommandRunner), returnedTypeName);
     }
 
     [Fact]
@@ -96,4 +112,20 @@ public sealed class InstalledModuleLoaderTestModule : IVitruvianModule
 
     public Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
         => Task.FromResult("ok");
+}
+
+public sealed class InstalledModuleLoaderCommandRunnerModule : IVitruvianModule
+{
+    private readonly ICommandRunner _commandRunner;
+
+    public InstalledModuleLoaderCommandRunnerModule(ICommandRunner commandRunner)
+    {
+        _commandRunner = commandRunner;
+    }
+
+    public string Domain => "installed-loader-command-runner-test";
+    public string Description => "Installed loader command runner test module";
+
+    public Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
+        => Task.FromResult(_commandRunner.GetType().Name);
 }

@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using VitruvianAbstractions;
 using VitruvianAbstractions.Interfaces;
 using VitruvianPluginSdk.Attributes;
 
@@ -48,16 +49,23 @@ public static class InstalledModuleLoader
     public static IReadOnlyList<IVitruvianModule> CreateModulesFromAssembly(Assembly assembly, IServiceProvider services)
     {
         var modules = new List<IVitruvianModule>();
+        ICommandRunner? fallbackCommandRunner = null;
         foreach (var moduleType in assembly
                      .GetExportedTypes()
                      .Where(static type => typeof(IVitruvianModule).IsAssignableFrom(type)
-                                           && type is { IsAbstract: false, IsClass: true }))
+                                            && type is { IsAbstract: false, IsClass: true }))
         {
             try
             {
                 WarnOnMissingApiKeys(moduleType);
 
-                if (ActivatorUtilities.CreateInstance(services, moduleType) is IVitruvianModule module)
+                object[] explicitArgs = RequiresCommandRunner(moduleType)
+                    ? [ResolveCommandRunner(services, ref fallbackCommandRunner)]
+                    : [];
+
+                var instance = ActivatorUtilities.CreateInstance(services, moduleType, explicitArgs);
+
+                if (instance is IVitruvianModule module)
                     modules.Add(module);
             }
             catch (Exception ex)
@@ -67,6 +75,21 @@ public static class InstalledModuleLoader
         }
 
         return modules;
+    }
+
+    private static ICommandRunner ResolveCommandRunner(IServiceProvider services, ref ICommandRunner? fallbackCommandRunner)
+    {
+        return services.GetService<ICommandRunner>()
+            ?? fallbackCommandRunner
+            ?? (fallbackCommandRunner = new ProcessCommandRunner());
+    }
+
+    private static bool RequiresCommandRunner(Type moduleType)
+    {
+        return moduleType
+            .GetConstructors()
+            .SelectMany(static ctor => ctor.GetParameters())
+            .Any(static parameter => parameter.ParameterType == typeof(ICommandRunner));
     }
 
     /// <summary>
