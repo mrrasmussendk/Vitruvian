@@ -30,4 +30,8 @@
     <ProjectReference Include="..\..\modules\Vitruvian.GmailModule\Vitruvian.GmailModule.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures\module-skill.md" />
+  </ItemGroup>
+
 </Project>
