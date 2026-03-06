@@ -14,10 +14,17 @@ public sealed class ModulePreferences
 
     /// <summary>
     /// Map of module domain → enabled flag. Modules not present in this map
-    /// are treated as enabled by default.
+    /// are treated as disabled by default (opt-in).
     /// </summary>
     [JsonPropertyName("enabledModules")]
     public Dictionary<string, bool> EnabledModules { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Set of module domains that are considered "built-in" and enabled by default.
+    /// Discovered modules from the modules/ folder require explicit opt-in.
+    /// </summary>
+    [JsonPropertyName("builtInModules")]
+    public HashSet<string> BuiltInModules { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Returns the default file path for the preferences file, next to the application.
@@ -45,6 +52,12 @@ public sealed class ModulePreferences
                 foreach (var kvp in prefs.EnabledModules)
                     normalized[kvp.Key] = kvp.Value;
                 prefs.EnabledModules = normalized;
+
+                // Ensure BuiltInModules uses case-insensitive comparer
+                var builtInNormalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var module in prefs.BuiltInModules)
+                    builtInNormalized.Add(module);
+                prefs.BuiltInModules = builtInNormalized;
             }
             return prefs ?? new ModulePreferences();
         }
@@ -66,10 +79,17 @@ public sealed class ModulePreferences
 
     /// <summary>
     /// Returns <c>true</c> if the module with the given domain is enabled.
-    /// Modules not explicitly configured are enabled by default.
+    /// Built-in modules are enabled by default. Discovered modules require explicit opt-in.
     /// </summary>
     public bool IsModuleEnabled(string domain)
-        => !EnabledModules.TryGetValue(domain, out var enabled) || enabled;
+    {
+        // Check explicit preference first
+        if (EnabledModules.TryGetValue(domain, out var enabled))
+            return enabled;
+
+        // For modules not explicitly configured, check if they're built-in
+        return BuiltInModules.Contains(domain);
+    }
 
     /// <summary>
     /// Sets whether the module with the given domain should be enabled or disabled.

@@ -88,6 +88,9 @@ public static class OnboardingFlow
                 Console.WriteLine("  Run 'Vitruvian --setup' to try again or 'Vitruvian --model <provider>' to configure manually.");
             }
             Console.WriteLine();
+
+            // After basic setup, prompt for module selection
+            ConfigureModules();
         }
         else
         {
@@ -99,6 +102,48 @@ public static class OnboardingFlow
         }
 
         return (modelConfiguration, configError);
+    }
+
+    /// <summary>
+    /// Runs interactive module configuration, allowing users to select which modules to enable.
+    /// </summary>
+    public static void ConfigureModules()
+    {
+        var modulesPath = Path.Combine(AppContext.BaseDirectory, "modules");
+        var preferences = ModulePreferences.Load();
+
+        // Get standard modules
+        var standardModules = ModuleSelector.GetStandardModuleInfos();
+
+        // Discover modules from modules/ folder
+        var discoveredModules = ModuleSelector.DiscoverModulesFromFolder(modulesPath);
+
+        // Combine all modules
+        var allModules = standardModules.Concat(discoveredModules).ToList();
+
+        if (allModules.Count == 0)
+        {
+            Console.WriteLine("No modules found to configure.");
+            return;
+        }
+
+        Console.WriteLine("Would you like to configure which modules to enable? (Y/n): ");
+        var response = Console.ReadLine()?.Trim().ToLowerInvariant();
+
+        if (response == "n" || response == "no")
+        {
+            Console.WriteLine("Skipping module configuration. All built-in modules will be enabled by default.");
+            Console.WriteLine("Discovered modules will be disabled. Run 'Vitruvian --configure-modules' to change this.");
+            Console.WriteLine();
+            return;
+        }
+
+        // Run interactive selection
+        var updatedPreferences = ModuleSelector.RunInteractiveSelection(allModules, preferences);
+        updatedPreferences.Save();
+
+        Console.WriteLine("✓ Module preferences saved.");
+        Console.WriteLine();
     }
 
     private static void PrintWelcomeBanner()

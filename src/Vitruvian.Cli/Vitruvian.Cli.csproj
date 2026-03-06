@@ -39,6 +39,16 @@
       <PackagePath>tools/net8.0/any/modules</PackagePath>
       <Pack>true</Pack>
     </Content>
+    <Content Include="..\..\modules\Vitruvian.GoogleCalendarModule\bin\Release\net8.0\Vitruvian.GoogleCalendarModule.dll" Link="modules/Vitruvian.GoogleCalendarModule.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <PackagePath>tools/net8.0/any/modules</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="..\..\modules\Vitruvian.GoogleDriveModule\bin\Release\net8.0\Vitruvian.GoogleDriveModule.dll" Link="modules/Vitruvian.GoogleDriveModule.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <PackagePath>tools/net8.0/any/modules</PackagePath>
+      <Pack>true</Pack>
+    </Content>
   </ItemGroup>
 
 </Project>

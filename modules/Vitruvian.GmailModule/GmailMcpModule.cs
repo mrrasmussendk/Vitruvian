@@ -11,10 +11,8 @@ namespace VitruvianGmailModule;
 /// </summary>
 [RequiresPermission(ModuleAccess.Read)]
 [RequiresApiKey("GOOGLE_API_TOKEN")]
-public sealed class GmailMcpModule : IVitruvianModule
+public sealed class GmailMcpModule(IModelClient? modelClient = null) : IVitruvianModule
 {
-    private readonly IModelClient? _modelClient;
-
     /// <summary>
     /// MCP tool connecting to a Gmail MCP server for reading and searching messages.
     /// </summary>
@@ -22,14 +20,9 @@ public sealed class GmailMcpModule : IVitruvianModule
     public string Domain => "gmail-mcp";
     public string Description => "Read, search, and draft Gmail messages using MCP";
 
-    public GmailMcpModule(IModelClient? modelClient = null)
-    {
-        _modelClient = modelClient;
-    }
-
     public async Task<string> ExecuteAsync(string request, string? userId, CancellationToken ct)
     {
-        if (_modelClient is null)
+        if (modelClient is null)
             return "No model configured. Run 'Vitruvian --setup' or scripts/install.sh (Linux/macOS) / scripts/install.ps1 (Windows).";
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -46,7 +39,7 @@ public sealed class GmailMcpModule : IVitruvianModule
             "You are a Gmail assistant. Use the Gmail MCP server to read, search, and draft emails. " +
             "You may create draft replies but never send messages directly.";
 
-        var response = await _modelClient.CompleteAsync(
+        var response = await modelClient.CompleteAsync(
             systemMessage: systemMessage,
             userMessage: request,
             tools: [GmailMcpTool],

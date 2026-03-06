@@ -80,6 +80,14 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 // Load module preferences to determine which standard modules to enable.
 var modulePreferences = ModulePreferences.Load();
 
+// Mark standard modules as built-in (enabled by default)
+var standardModuleDomains = new[] { "conversation", "file-operations", "web-search", "summarization", "shell-command" };
+foreach (var domain in standardModuleDomains)
+{
+    if (!modulePreferences.BuiltInModules.Contains(domain))
+        modulePreferences.BuiltInModules.Add(domain);
+}
+
 // Register modules — core modules are always registered, optional modules respect preferences.
 builder.Services.AddSingleton<IVitruvianModule>(sp =>
     new ConversationModule(sp.GetService<IModelClient>()));

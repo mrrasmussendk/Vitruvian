@@ -7,19 +7,33 @@ namespace VitruvianTests;
 public sealed class ModulePreferencesTests
 {
     [Fact]
-    public void IsModuleEnabled_WithNoPreferences_ReturnsTrue()
+    public void IsModuleEnabled_WithNoPreferences_ReturnsFalseForDiscoveredModules()
     {
         var prefs = new ModulePreferences();
 
+        // Discovered modules are disabled by default (opt-in)
+        Assert.False(prefs.IsModuleEnabled("conversation"));
+        Assert.False(prefs.IsModuleEnabled("file-operations"));
+        Assert.False(prefs.IsModuleEnabled("unknown-module"));
+    }
+
+    [Fact]
+    public void IsModuleEnabled_BuiltInModules_AreEnabledByDefault()
+    {
+        var prefs = new ModulePreferences();
+        prefs.BuiltInModules.Add("conversation");
+        prefs.BuiltInModules.Add("file-operations");
+
         Assert.True(prefs.IsModuleEnabled("conversation"));
         Assert.True(prefs.IsModuleEnabled("file-operations"));
-        Assert.True(prefs.IsModuleEnabled("unknown-module"));
+        Assert.False(prefs.IsModuleEnabled("unknown-module"));
     }
 
     [Fact]
     public void SetModuleEnabled_DisablesModule()
     {
         var prefs = new ModulePreferences();
+        prefs.BuiltInModules.Add("conversation");
 
         prefs.SetModuleEnabled("gmail", false);
 
@@ -72,6 +86,7 @@ public sealed class ModulePreferencesTests
         try
         {
             var prefs = new ModulePreferences();
+            prefs.BuiltInModules.Add("conversation");
             prefs.SetModuleEnabled("gmail", false);
             prefs.SetModuleEnabled("web-search", true);
             prefs.SetModuleEnabled("shell-command", false);
@@ -83,7 +98,7 @@ public sealed class ModulePreferencesTests
             Assert.False(loaded.IsModuleEnabled("gmail"));
             Assert.True(loaded.IsModuleEnabled("web-search"));
             Assert.False(loaded.IsModuleEnabled("shell-command"));
-            Assert.True(loaded.IsModuleEnabled("conversation"));
+            Assert.True(loaded.IsModuleEnabled("conversation")); // Built-in module
         }
         finally
         {
@@ -100,7 +115,7 @@ public sealed class ModulePreferencesTests
         var loaded = ModulePreferences.Load(nonExistentPath);
 
         Assert.True(loaded.IsEmpty);
-        Assert.True(loaded.IsModuleEnabled("any-module"));
+        Assert.False(loaded.IsModuleEnabled("any-module")); // Opt-in by default
     }
 
     [Fact]

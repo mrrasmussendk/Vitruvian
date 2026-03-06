@@ -28,6 +28,8 @@
     <ProjectReference Include="..\..\src\Vitruvian.Runtime\Vitruvian.Runtime.csproj" />
     <ProjectReference Include="..\..\src\Vitruvian.StandardModules\Vitruvian.StandardModules.csproj" />
     <ProjectReference Include="..\..\modules\Vitruvian.GmailModule\Vitruvian.GmailModule.csproj" />
+    <ProjectReference Include="..\..\modules\Vitruvian.GoogleCalendarModule\Vitruvian.GoogleCalendarModule.csproj" />
+    <ProjectReference Include="..\..\modules\Vitruvian.GoogleDriveModule\Vitruvian.GoogleDriveModule.csproj" />
   </ItemGroup>
 
 </Project>
