@@ -1,16 +1,14 @@
 using System.Reflection;
-using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using VitruvianAbstractions;
 using VitruvianCli;
+using VitruvianCli.Commands;
 using VitruvianRuntime;
 using VitruvianRuntime.Routing;
-using VitruvianAbstractions.Facts;
 using VitruvianAbstractions.Interfaces;
 using VitruvianAbstractions.Scheduling;
 using VitruvianPluginHost;
-using VitruvianPluginSdk.Attributes;
 using VitruvianRuntime.DI;
 using VitruvianRuntime.Scheduling;
 using VitruvianStandardModules;
@@ -20,110 +18,8 @@ EnvFileLoader.Load(overwriteExisting: true);
 
 var pluginsPath = Path.Combine(AppContext.BaseDirectory, "plugins");
 var modulesPath = Path.Combine(AppContext.BaseDirectory, "modules");
-void PrintCommands() => Console.WriteLine("Commands: /help, /setup, /list-modules, /configure-modules, /install-module <path|package@version> [--allow-unsigned], /load-module <path-to-dll>, /unregister-module <domain|filename>, /inspect-module <path|package@version> [--json], /doctor [--json], /policy validate <policyFile>, /policy explain <request>, /audit list, /audit show <id> [--json], /replay <id> [--no-exec], /new-module <Name> [OutputPath], /schedule \"<interval>\" <request>, /list-tasks, /cancel-task <id>, quit");
-string GetCurrentPersonaDisplay()
-{
-    var activePersona = Environment.GetEnvironmentVariable("VITRUVIAN_PROFILE");
-    return string.IsNullOrWhiteSpace(activePersona)
-        ? "default"
-        : activePersona.Trim();
-}
-string? PromptForSecret(string secretName)
-{
-    Console.Write($"Missing required secret '{secretName}'. Enter value (blank will fail install): ");
-    var value = ReadSecretFromConsole();
-    Console.WriteLine();
-    return value;
-}
 
-static string ReadSecretFromConsole()
-{
-    if (Console.IsInputRedirected)
-        return Console.ReadLine() ?? string.Empty;
-
-    var buffer = new List<char>();
-    while (true)
-    {
-        var key = Console.ReadKey(intercept: true);
-        if (key.Key == ConsoleKey.Enter)
-            return new string(buffer.ToArray());
-
-        if (key.Key == ConsoleKey.Backspace)
-        {
-            if (buffer.Count == 0)
-                continue;
-            buffer.RemoveAt(buffer.Count - 1);
-            Console.Write("\b \b");
-            continue;
-        }
-
-        if (!char.IsControl(key.KeyChar))
-        {
-            buffer.Add(key.KeyChar);
-            Console.Write('*');
-        }
-    }
-}
-void PrintInstalledModules()
-{
-    var prefs = ModulePreferences.Load();
-    var standardInfos = ModuleSelector.GetStandardModuleInfos();
-
-    Console.WriteLine("Standard modules:");
-    foreach (var info in standardInfos)
-    {
-        var status = info.IsCore || prefs.IsModuleEnabled(info.Domain) ? "enabled" : "disabled";
-        var coreTag = info.IsCore ? " (core)" : "";
-        Console.WriteLine($"  - {info.Domain} [{status}]{coreTag}");
-    }
-
-    // Show modules from the modules/ folder
-    var discoveredModules = ModuleSelector.DiscoverModulesFromFolder(modulesPath);
-    if (discoveredModules.Count > 0)
-    {
-        Console.WriteLine("Discovered modules (modules/ folder):");
-        foreach (var info in discoveredModules)
-        {
-            var status = prefs.IsModuleEnabled(info.Domain) ? "enabled" : "disabled";
-            Console.WriteLine($"  - {info.Domain} [{status}]  ({info.Source})");
-        }
-    }
-
-    using var loaderServiceProvider = new ServiceCollection().BuildServiceProvider();
-    var installedModules = InstalledModuleLoader.LoadModulesWithSources(pluginsPath, loaderServiceProvider);
-    var installedDlls = ModuleInstaller.ListInstalledModules(pluginsPath);
-    if (installedDlls.Count == 0)
-    {
-        Console.WriteLine("No installed plugin modules found.");
-    }
-    else
-    {
-        Console.WriteLine("Installed plugin modules:");
-        foreach (var (module, dllPath) in installedModules)
-        {
-            Console.WriteLine($"  - {module.Domain}  ({Path.GetFileName(dllPath)})");
-        }
-
-        // Show any DLLs that didn't produce loadable modules
-        var loadedDlls = installedModules.Select(m => Path.GetFileName(m.SourceDllPath)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var dll in installedDlls.Where(d => !loadedDlls.Contains(d)))
-        {
-            Console.WriteLine($"  - {dll}  (could not load)");
-        }
-
-        Console.WriteLine("Use '/unregister-module <domain or filename>' to remove.");
-    }
-
-    Console.WriteLine("\nUse '/configure-modules' or '--configure-modules' to change module selection.");
-}
-
-Task<int> PrintAuditListAsync()
-{
-    Console.WriteLine("Audit feature removed with UtilityAI package.");
-    Console.WriteLine("Audit functionality was part of the old architecture and is no longer available.");
-    return Task.FromResult(1);
-}
-
+// --- Handle startup commands (run once and exit) ---
 var startupArgs = args
     .Where(arg => !string.IsNullOrWhiteSpace(arg))
     .Select(arg => arg.Trim())
@@ -131,264 +27,15 @@ var startupArgs = args
 if (startupArgs.Length >= 1 && string.Equals(startupArgs[0], "--", StringComparison.Ordinal))
     startupArgs = startupArgs[1..];
 
-if (startupArgs.Length >= 1 &&
-    (string.Equals(startupArgs[0], "--help", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "/help", StringComparison.OrdinalIgnoreCase)))
+var commandRouter = CommandRouter.CreateDefault(pluginsPath, modulesPath);
+if (commandRouter.TryRoute(startupArgs, out var command))
 {
-    Console.WriteLine("Vitruvian CLI arguments:");
-    Console.WriteLine("  --help");
-    Console.WriteLine("  --setup");
-    Console.WriteLine("  --list-modules");
-    Console.WriteLine("  --install-module <path|package@version> [--allow-unsigned]");
-    Console.WriteLine("  --unregister-module <domain>");
-    Console.WriteLine("  --configure-modules");
-    Console.WriteLine("  --model <provider[:model]>  (e.g. --model openai or --model anthropic:claude-3-5-sonnet-latest)");
-    Console.WriteLine("  --inspect-module <path|package@version> [--json] (alias: inspect-module)");
-    Console.WriteLine("  --doctor [--json] (alias: doctor)");
-    Console.WriteLine("  --policy validate <policyFile> (alias: policy validate)");
-    Console.WriteLine("  --policy explain <request> (alias: policy explain)");
-    Console.WriteLine("  --audit list (alias: audit list)");
-    Console.WriteLine("  --audit show <id> [--json] (alias: audit show)");
-    Console.WriteLine("  --replay <id> [--no-exec] (alias: replay)");
-    Console.WriteLine("  --new-module <Name> [OutputPath]");
-    Console.WriteLine();
-    Console.WriteLine("Getting started:");
-    Console.WriteLine("  1) Vitruvian --setup");
-    Console.WriteLine("  2) Vitruvian");
-    Console.WriteLine("  3) In interactive mode, type /help for commands or 'quit' to exit.");
+    await command.ExecuteAsync(startupArgs);
     return;
 }
 
-if (startupArgs.Length >= 1 &&
-    (string.Equals(startupArgs[0], "--list-modules", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "/list-modules", StringComparison.OrdinalIgnoreCase)))
-{
-    PrintInstalledModules();
-    return;
-}
-
-if (startupArgs.Length >= 2 &&
-    (string.Equals(startupArgs[0], "--install-module", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "/install-module", StringComparison.OrdinalIgnoreCase)))
-{
-    var allowUnsigned = startupArgs.Any(a => string.Equals(a, "--allow-unsigned", StringComparison.OrdinalIgnoreCase));
-    var installResult = await ModuleInstaller.InstallWithResultAsync(startupArgs[1], pluginsPath, allowUnsigned, PromptForSecret);
-    Console.WriteLine(installResult.Message);
-    if (!installResult.Success)
-        Environment.ExitCode = 1;
-    Console.WriteLine("Restart Vitruvian CLI to load the new module.");
-    return;
-}
-
-if (startupArgs.Length >= 2 &&
-    (string.Equals(startupArgs[0], "inspect-module", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "--inspect-module", StringComparison.OrdinalIgnoreCase)))
-{
-    var report = await ModuleInstaller.InspectAsync(startupArgs[1]);
-    var asJson = startupArgs.Any(a => string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase));
-    if (asJson)
-        Console.WriteLine(JsonSerializer.Serialize(report, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
-    else
-    {
-        Console.WriteLine(report.Summary);
-        Console.WriteLine($"  hasModule: {report.HasUtilityAiModule}");
-        Console.WriteLine($"  signed: {report.IsSigned}");
-        Console.WriteLine($"  manifest: {report.HasManifest}");
-        if (report.Capabilities.Count > 0)
-            Console.WriteLine($"  capabilities: {string.Join(", ", report.Capabilities)}");
-        if (report.Permissions.Count > 0)
-            Console.WriteLine($"  permissions: {string.Join(", ", report.Permissions)}");
-        if (report.Findings.Count > 0)
-            Console.WriteLine($"  findings: {string.Join(" | ", report.Findings)}");
-    }
-    return;
-}
-
-if (startupArgs.Length >= 1 &&
-    (string.Equals(startupArgs[0], "doctor", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "--doctor", StringComparison.OrdinalIgnoreCase)))
-{
-    var hasUnsigned = ModuleInstaller.ListInstalledModules(pluginsPath).Any();
-    var findings = new List<string>();
-    if (hasUnsigned)
-        findings.Add("Installed modules should be inspected with `Vitruvian inspect-module` and signed by default.");
-    if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VITRUVIAN_MEMORY_CONNECTION_STRING")))
-        findings.Add("Audit store not configured. Set VITRUVIAN_MEMORY_CONNECTION_STRING to SQLite for deterministic audit.");
-    if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VITRUVIAN_SECRET_PROVIDER")))
-        findings.Add("Secret provider not configured. Set VITRUVIAN_SECRET_PROVIDER to avoid direct environment-secret usage.");
-
-    var report = new
-    {
-        Status = findings.Count == 0 ? "healthy" : "needs-attention",
-        Findings = findings
-    };
-    if (startupArgs.Any(a => string.Equals(a, "--json", StringComparison.OrdinalIgnoreCase)))
-        Console.WriteLine(JsonSerializer.Serialize(report, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
-    else
-    {
-        Console.WriteLine($"Doctor status: {report.Status}");
-        foreach (var finding in report.Findings)
-            Console.WriteLine($"  - {finding}");
-    }
-    return;
-}
-
-if (startupArgs.Length >= 3 &&
-    (string.Equals(startupArgs[0], "policy", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "--policy", StringComparison.OrdinalIgnoreCase)) &&
-    string.Equals(startupArgs[1], "validate", StringComparison.OrdinalIgnoreCase))
-{
-    var policyPath = startupArgs[2];
-    if (!File.Exists(policyPath))
-    {
-        Console.WriteLine($"Policy validation failed: '{policyPath}' not found.");
-        return;
-    }
-
-    try
-    {
-        using var stream = File.OpenRead(policyPath);
-        using var document = await JsonDocument.ParseAsync(stream);
-        var root = document.RootElement;
-        var hasRules = root.TryGetProperty("rules", out var rules) && rules.ValueKind == JsonValueKind.Array;
-        Console.WriteLine(hasRules
-            ? "Policy validation succeeded."
-            : "Policy validation failed: expected top-level JSON array property 'rules'.");
-    }
-    catch (JsonException ex)
-    {
-        Console.WriteLine($"Policy validation failed: {ex.Message}");
-    }
-    return;
-}
-
-if (startupArgs.Length >= 3 &&
-    (string.Equals(startupArgs[0], "policy", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "--policy", StringComparison.OrdinalIgnoreCase)) &&
-    string.Equals(startupArgs[1], "explain", StringComparison.OrdinalIgnoreCase))
-{
-    var request = string.Join(' ', startupArgs.Skip(2));
-    var requiresApproval = request.Contains("delete", StringComparison.OrdinalIgnoreCase)
-        || request.Contains("write", StringComparison.OrdinalIgnoreCase)
-        || request.Contains("update", StringComparison.OrdinalIgnoreCase);
-    Console.WriteLine(requiresApproval
-        ? "Policy explain: matched EnterpriseSafe write/destructive guard; approval required."
-        : "Policy explain: matched EnterpriseSafe readonly allow rule.");
-    return;
-}
-
-if (startupArgs.Length >= 2 &&
-    (string.Equals(startupArgs[0], "audit", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "--audit", StringComparison.OrdinalIgnoreCase)) &&
-    string.Equals(startupArgs[1], "list", StringComparison.OrdinalIgnoreCase))
-{
-    await PrintAuditListAsync();
-    return;
-}
-
-if (startupArgs.Length >= 3 &&
-    (string.Equals(startupArgs[0], "audit", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "--audit", StringComparison.OrdinalIgnoreCase)) &&
-    string.Equals(startupArgs[1], "show", StringComparison.OrdinalIgnoreCase))
-{
-    Console.WriteLine("Audit feature removed with UtilityAI package.");
-    Console.WriteLine("Audit functionality was part of the old architecture and is no longer available.");
-    return;
-}
-
-if (startupArgs.Length >= 2 &&
-    (string.Equals(startupArgs[0], "replay", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "--replay", StringComparison.OrdinalIgnoreCase)))
-{
-    Console.WriteLine($"Replay accepted for audit id '{startupArgs[1]}'.");
-    Console.WriteLine(startupArgs.Any(a => string.Equals(a, "--no-exec", StringComparison.OrdinalIgnoreCase))
-        ? "Replay mode: selection-only (no side effects)."
-        : "Replay mode: side effects disabled by default in this build.");
-    return;
-}
-
-if (startupArgs.Length >= 2 &&
-    (string.Equals(startupArgs[0], "--new-module", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "/new-module", StringComparison.OrdinalIgnoreCase)))
-{
-    var outputPath = startupArgs.Length >= 3 ? startupArgs[2] : Directory.GetCurrentDirectory();
-    Console.WriteLine(ModuleInstaller.ScaffoldNewModule(startupArgs[1], outputPath));
-    return;
-}
-
-if (startupArgs.Length >= 1 &&
-    (string.Equals(startupArgs[0], "--setup", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "/setup", StringComparison.OrdinalIgnoreCase)))
-{
-    var setupCompleted = ModuleInstaller.TryRunInstallScript();
-    if (setupCompleted)
-    {
-        EnvFileLoader.Load(startDirectory: AppContext.BaseDirectory, overwriteExisting: true);
-        Console.WriteLine($"Vitruvian setup complete. Current persona: {GetCurrentPersonaDisplay()}.");
-        if (ModelConfiguration.TryCreateFromEnvironment(out var setupModelConfig, out var setupError) && setupModelConfig is not null)
-            Console.WriteLine($"Model provider configured: {setupModelConfig.Provider} ({setupModelConfig.Model})");
-        else if (!string.IsNullOrWhiteSpace(setupError))
-            Console.WriteLine($"Model configuration warning: {setupError}");
-    }
-    else
-    {
-        Console.WriteLine("Vitruvian setup script could not be started. Ensure scripts/install.sh or scripts/install.ps1 exists next to the app.");
-    }
-    return;
-}
-
-if (startupArgs.Length >= 1 &&
-    (string.Equals(startupArgs[0], "--configure-modules", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "/configure-modules", StringComparison.OrdinalIgnoreCase)))
-{
-    var standardModules = ModuleSelector.GetStandardModuleInfos();
-    var discoveredModules = ModuleSelector.DiscoverModulesFromFolder(modulesPath);
-    var allModules = standardModules.Concat(discoveredModules).ToList();
-    var prefs = ModulePreferences.Load();
-    prefs = ModuleSelector.RunInteractiveSelection(allModules, prefs);
-    prefs.Save();
-    Console.WriteLine("Module preferences saved.");
-    return;
-}
-
-if (startupArgs.Length >= 2 &&
-    (string.Equals(startupArgs[0], "--model", StringComparison.OrdinalIgnoreCase) ||
-     string.Equals(startupArgs[0], "/model", StringComparison.OrdinalIgnoreCase)))
-{
-    var modelArg = startupArgs[1];
-    var colonIndex = modelArg.IndexOf(':');
-    var provider = colonIndex >= 0 ? modelArg[..colonIndex] : modelArg;
-    var modelName = colonIndex >= 0 ? modelArg[(colonIndex + 1)..] : null;
-
-    if (!string.Equals(provider, "openai", StringComparison.OrdinalIgnoreCase) &&
-        !string.Equals(provider, "anthropic", StringComparison.OrdinalIgnoreCase) &&
-        !string.Equals(provider, "gemini", StringComparison.OrdinalIgnoreCase))
-    {
-        Console.WriteLine($"Unknown provider '{provider}'. Supported: openai, anthropic, gemini.");
-        return;
-    }
-
-    EnvFileLoader.PersistSecret("VITRUVIAN_MODEL_PROVIDER", provider.ToLowerInvariant());
-    if (!string.IsNullOrWhiteSpace(modelName))
-        EnvFileLoader.PersistSecret("VITRUVIAN_MODEL_NAME", modelName);
-    EnvFileLoader.Load(overwriteExisting: true);
-    Console.WriteLine($"Model provider set to '{provider}'" +
-        (string.IsNullOrWhiteSpace(modelName) ? " (using default model)." : $" with model '{modelName}'."));
-    return;
-}
-
-string? modelConfigurationError = null;
-if (!ModelConfiguration.TryCreateFromEnvironment(out var modelConfiguration, out modelConfigurationError) &&
-    EnvFileLoader.FindFile([Directory.GetCurrentDirectory(), AppContext.BaseDirectory]) is null &&
-    !Console.IsInputRedirected)
-{
-    Console.WriteLine("No Vitruvian setup found. Running installer...");
-    if (ModuleInstaller.TryRunInstallScript())
-    {
-        EnvFileLoader.Load(startDirectory: AppContext.BaseDirectory, overwriteExisting: true);
-        ModelConfiguration.TryCreateFromEnvironment(out modelConfiguration, out modelConfigurationError);
-    }
-}
+// --- Onboarding: ensure model configuration is present ---
+var (modelConfiguration, modelConfigurationError) = OnboardingFlow.EnsureConfigured();
 if (modelConfiguration is null && !string.IsNullOrWhiteSpace(modelConfigurationError))
     Console.WriteLine($"Model configuration warning: {modelConfigurationError}");
 
@@ -547,20 +194,29 @@ else if (!string.IsNullOrWhiteSpace(discordToken) && !string.IsNullOrWhiteSpace(
 else
 {
     Console.WriteLine("Vitruvian CLI started. Type a request (or 'quit' to exit):");
-    PrintCommands();
+    ConsoleHelper.PrintCommands();
     if (modelConfiguration is not null)
         Console.WriteLine($"Model provider configured: {modelConfiguration.Provider} ({modelConfiguration.Model})");
-    Console.WriteLine($"Current persona: {GetCurrentPersonaDisplay()}");
+    Console.WriteLine($"Current persona: {SetupCommand.GetCurrentPersonaDisplay()}");
     Console.WriteLine($"Working directory: {workingDirectory}");
+
+    var listModulesCmd = new ListModulesCommand(pluginsPath, modulesPath);
+    var configureModulesCmd = new ConfigureModulesCommand(modulesPath);
 
     var cliService = new CliHostedService(
         requestProcessor,
         host.Services.GetRequiredService<IHostApplicationLifetime>(),
-        PrintCommands,
-        PrintInstalledModules,
+        ConsoleHelper.PrintCommands,
+        listModulesCmd.PrintInstalledModules,
         async (spec, unsigned) =>
         {
-            var installResult = await ModuleInstaller.InstallWithResultAsync(spec, pluginsPath, unsigned, PromptForSecret);
+            var installResult = await ModuleInstaller.InstallWithResultAsync(spec, pluginsPath, unsigned, secretName =>
+            {
+                Console.Write($"Missing required secret '{secretName}'. Enter value (blank will fail install): ");
+                var value = ConsoleHelper.ReadSecretFromConsole();
+                Console.WriteLine();
+                return value;
+            });
             Console.WriteLine($"  {installResult.Message}");
             if (installResult.Success)
             {
@@ -675,13 +331,8 @@ else
         scheduleParser,
         configureModules: () =>
         {
-            var standardModules = ModuleSelector.GetStandardModuleInfos();
-            var discoveredModules = ModuleSelector.DiscoverModulesFromFolder(modulesPath);
-            var allModules = standardModules.Concat(discoveredModules).ToList();
-            var prefs = ModulePreferences.Load();
-            prefs = ModuleSelector.RunInteractiveSelection(allModules, prefs);
-            prefs.Save();
-            Console.WriteLine("Module preferences saved. Restart Vitruvian CLI to apply changes.");
+            configureModulesCmd.RunConfigureModules();
+            Console.WriteLine("Restart Vitruvian CLI to apply changes.");
         });
 
     // Register the CLI service as a hosted service and run the host.
