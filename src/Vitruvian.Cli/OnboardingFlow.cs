@@ -1,5 +1,3 @@
-using VitruvianCli.Commands;
-
 namespace VitruvianCli;
 
 /// <summary>
@@ -43,12 +41,23 @@ public static class OnboardingFlow
             Console.WriteLine();
             if (modelConfiguration is not null)
             {
-                Console.WriteLine("┌─────────────────────────────────────────────┐");
-                Console.WriteLine("│  ✓ Setup complete!                          │");
-                Console.WriteLine($"│  Provider: {modelConfiguration.Provider,-33}│");
-                Console.WriteLine($"│  Model: {modelConfiguration.Model,-36}│");
-                Console.WriteLine($"│  Persona: {SetupCommand.GetCurrentPersonaDisplay(),-34}│");
-                Console.WriteLine("└─────────────────────────────────────────────┘");
+                var provider = modelConfiguration.Provider;
+                var model = modelConfiguration.Model;
+                var persona = ConsoleHelper.GetCurrentPersonaDisplay();
+
+                // Compute dynamic box width based on content
+                var contentWidth = Math.Max(
+                    Math.Max("  ✓ Setup complete!".Length, $"  Provider: {provider}".Length),
+                    Math.Max($"  Model: {model}".Length, $"  Persona: {persona}".Length));
+                var boxWidth = contentWidth + 4; // padding
+
+                var border = new string('─', boxWidth);
+                Console.WriteLine($"┌{border}┐");
+                Console.WriteLine($"│{"  ✓ Setup complete!".PadRight(boxWidth)}│");
+                Console.WriteLine($"│{$"  Provider: {provider}".PadRight(boxWidth)}│");
+                Console.WriteLine($"│{$"  Model: {model}".PadRight(boxWidth)}│");
+                Console.WriteLine($"│{$"  Persona: {persona}".PadRight(boxWidth)}│");
+                Console.WriteLine($"└{border}┘");
             }
             else
             {

@@ -45,4 +45,16 @@ public static class ConsoleHelper
     {
         Console.WriteLine("Commands: /help, /setup, /list-modules, /configure-modules, /install-module <path|package@version> [--allow-unsigned], /load-module <path-to-dll>, /unregister-module <domain|filename>, /inspect-module <path|package@version> [--json], /doctor [--json], /policy validate <policyFile>, /policy explain <request>, /audit list, /audit show <id> [--json], /replay <id> [--no-exec], /new-module <Name> [OutputPath], /schedule \"<interval>\" <request>, /list-tasks, /cancel-task <id>, quit");
     }
+
+    /// <summary>
+    /// Returns the current persona display name from the <c>VITRUVIAN_PROFILE</c> environment variable.
+    /// Falls back to "default" when no profile is configured.
+    /// </summary>
+    public static string GetCurrentPersonaDisplay()
+    {
+        var activePersona = Environment.GetEnvironmentVariable("VITRUVIAN_PROFILE");
+        return string.IsNullOrWhiteSpace(activePersona)
+            ? "default"
+            : activePersona.Trim();
+    }
 }

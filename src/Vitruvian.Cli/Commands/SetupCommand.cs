@@ -16,7 +16,7 @@ public sealed class SetupCommand : ICliCommand
         if (setupCompleted)
         {
             EnvFileLoader.Load(startDirectory: AppContext.BaseDirectory, overwriteExisting: true);
-            Console.WriteLine($"Vitruvian setup complete. Current persona: {GetCurrentPersonaDisplay()}.");
+            Console.WriteLine($"Vitruvian setup complete. Current persona: {ConsoleHelper.GetCurrentPersonaDisplay()}.");
             if (ModelConfiguration.TryCreateFromEnvironment(out var setupModelConfig, out var setupError) && setupModelConfig is not null)
                 Console.WriteLine($"Model provider configured: {setupModelConfig.Provider} ({setupModelConfig.Model})");
             else if (!string.IsNullOrWhiteSpace(setupError))
@@ -30,11 +30,5 @@ public sealed class SetupCommand : ICliCommand
         return Task.FromResult(setupCompleted ? 0 : 1);
     }
 
-    internal static string GetCurrentPersonaDisplay()
-    {
-        var activePersona = Environment.GetEnvironmentVariable("VITRUVIAN_PROFILE");
-        return string.IsNullOrWhiteSpace(activePersona)
-            ? "default"
-            : activePersona.Trim();
-    }
+    internal static string GetCurrentPersonaDisplay() => ConsoleHelper.GetCurrentPersonaDisplay();
 }

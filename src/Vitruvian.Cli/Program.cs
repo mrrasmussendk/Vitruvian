@@ -197,7 +197,7 @@ else
     ConsoleHelper.PrintCommands();
     if (modelConfiguration is not null)
         Console.WriteLine($"Model provider configured: {modelConfiguration.Provider} ({modelConfiguration.Model})");
-    Console.WriteLine($"Current persona: {SetupCommand.GetCurrentPersonaDisplay()}");
+    Console.WriteLine($"Current persona: {ConsoleHelper.GetCurrentPersonaDisplay()}");
     Console.WriteLine($"Working directory: {workingDirectory}");
 
     var listModulesCmd = new ListModulesCommand(pluginsPath, modulesPath);
