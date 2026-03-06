@@ -57,7 +57,7 @@ write_active_profile() {
 
 if [[ $# -ge 1 ]]; then
   profile="$(normalize_profile "$1")" || { echo "Invalid profile '$1'. Use dev, personal, team, or prod."; exit 1; }
-  profile_file="$ROOT_DIR/.env.Vitruvian${profile}"
+  profile_file="$ROOT_DIR/.env.Vitruvian.${profile}"
   if [[ ! -f "$profile_file" ]]; then
     echo "Profile '$profile' does not exist yet. Create it first by running the installer without arguments."
     exit 1
@@ -80,7 +80,7 @@ echo "  3) team"
 echo "  4) prod"
 read -r -p "> " profile_choice
 profile="$(normalize_profile "$profile_choice")" || { echo "Invalid profile choice"; exit 1; }
-profile_env_file="$ROOT_DIR/.env.Vitruvian${profile}"
+profile_env_file="$ROOT_DIR/.env.Vitruvian.${profile}"
 
 if [[ "$onboarding_action" == "2" ]]; then
   if [[ ! -f "$profile_env_file" ]]; then

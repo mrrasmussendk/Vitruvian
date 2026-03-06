@@ -73,7 +73,7 @@ function Set-ActiveProfile {
 
 if (-not [string]::IsNullOrWhiteSpace($Profile)) {
     $resolvedProfile = Resolve-ProfileName $Profile
-    $profileFile = Join-Path $RootDir ".env.Vitruvian$resolvedProfile"
+    $profileFile = Join-Path $RootDir ".env.Vitruvian.$resolvedProfile"
     if (-not (Test-Path $profileFile)) {
         throw "Profile '$resolvedProfile' does not exist yet. Create it first by running the installer without parameters."
     }
@@ -95,7 +95,7 @@ Write-Host '  3) team'
 Write-Host '  4) prod'
 $profileChoice = Read-Host '>'
 $resolvedProfile = Resolve-ProfileName $profileChoice
-$ProfileEnvFile = Join-Path $RootDir ".env.Vitruvian$resolvedProfile"
+$ProfileEnvFile = Join-Path $RootDir ".env.Vitruvian.$resolvedProfile"
 
 if ($onboardingAction -eq '2') {
     if (-not (Test-Path $ProfileEnvFile)) {

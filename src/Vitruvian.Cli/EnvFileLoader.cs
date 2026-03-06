@@ -16,6 +16,7 @@ namespace VitruvianCli;
 public static class EnvFileLoader
 {
     private const string FileName = ".env.Vitruvian";
+    private const string LegacyProfileFileNamePrefix = ".env.Vitruvian";
     private const string ProfileVariableName = "VITRUVIAN_PROFILE";
 
     /// <summary>
@@ -44,7 +45,8 @@ public static class EnvFileLoader
         if (string.IsNullOrWhiteSpace(profile))
             return;
 
-        var profilePath = FindFile(searchDirectories, $"{FileName}.{profile}");
+        var profilePath = FindFile(searchDirectories, $"{FileName}.{profile}")
+                          ?? FindFile(searchDirectories, $"{LegacyProfileFileNamePrefix}{profile}");
         if (profilePath is null || string.Equals(profilePath, path, StringComparison.OrdinalIgnoreCase))
             return;
 
@@ -82,7 +84,7 @@ public static class EnvFileLoader
     /// Persists <paramref name="key"/>=<paramref name="value"/> to the <c>.env.Vitruvian</c>
     /// file.  If the file already contains an entry for <paramref name="key"/> it is updated
     /// in-place; otherwise a new line is appended.  When no existing file is found, one is
-    /// created in <paramref name="fallbackDirectory"/> (defaults to the current directory).
+    /// created in <paramref name="fallbackDirectory"/> (defaults to <see cref="AppContext.BaseDirectory"/>).
     /// </summary>
     public static void PersistSecret(string key, string value, string? fallbackDirectory = null)
     {
@@ -90,7 +92,7 @@ public static class EnvFileLoader
         ArgumentNullException.ThrowIfNull(value);
 
         var searchDirs = new[] { fallbackDirectory ?? Directory.GetCurrentDirectory(), AppContext.BaseDirectory };
-        var path = FindFile(searchDirs) ?? Path.Combine(searchDirs[0], FileName);
+        var path = FindFile(searchDirs) ?? Path.Combine(AppContext.BaseDirectory, FileName);
 
         // Read existing lines (or start with an empty list for a new file).
         var lines = File.Exists(path) ? File.ReadAllLines(path).ToList() : new List<string>();

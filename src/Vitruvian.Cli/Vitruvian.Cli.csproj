@@ -16,7 +16,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.1.4</Version>
+    <Version>0.2.0</Version>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>vitruvian</ToolCommandName>
     <PackageId>Vitruvian</PackageId>
@@ -33,6 +33,11 @@
     <Content Include="..\..\scripts\install.ps1" Link="scripts/install.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>false</Pack>
+    </Content>
+    <Content Include="..\..\modules\Vitruvian.GmailModule\bin\Release\net8.0\Vitruvian.GmailModule.dll" Link="modules/Vitruvian.GmailModule.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <PackagePath>tools/net8.0/any/modules</PackagePath>
+      <Pack>true</Pack>
     </Content>
   </ItemGroup>
 

@@ -19,7 +19,15 @@ using VitruvianStandardModules;
 EnvFileLoader.Load(overwriteExisting: true);
 
 var pluginsPath = Path.Combine(AppContext.BaseDirectory, "plugins");
-void PrintCommands() => Console.WriteLine("Commands: /help, /setup, /list-modules, /install-module <path|package@version> [--allow-unsigned], /load-module <path-to-dll>, /unregister-module <domain|filename>, /inspect-module <path|package@version> [--json], /doctor [--json], /policy validate <policyFile>, /policy explain <request>, /audit list, /audit show <id> [--json], /replay <id> [--no-exec], /new-module <Name> [OutputPath], /schedule \"<interval>\" <request>, /list-tasks, /cancel-task <id>, quit");
+var modulesPath = Path.Combine(AppContext.BaseDirectory, "modules");
+void PrintCommands() => Console.WriteLine("Commands: /help, /setup, /list-modules, /configure-modules, /install-module <path|package@version> [--allow-unsigned], /load-module <path-to-dll>, /unregister-module <domain|filename>, /inspect-module <path|package@version> [--json], /doctor [--json], /policy validate <policyFile>, /policy explain <request>, /audit list, /audit show <id> [--json], /replay <id> [--no-exec], /new-module <Name> [OutputPath], /schedule \"<interval>\" <request>, /list-tasks, /cancel-task <id>, quit");
+string GetCurrentPersonaDisplay()
+{
+    var activePersona = Environment.GetEnvironmentVariable("VITRUVIAN_PROFILE");
+    return string.IsNullOrWhiteSpace(activePersona)
+        ? "default"
+        : activePersona.Trim();
+}
 string? PromptForSecret(string secretName)
 {
     Console.Write($"Missing required secret '{secretName}'. Enter value (blank will fail install): ");
@@ -58,28 +66,39 @@ static string ReadSecretFromConsole()
 }
 void PrintInstalledModules()
 {
-    var standardModules = new[]
-    {
-        nameof(VitruvianStandardModules.ConversationModule),
-        nameof(VitruvianStandardModules.FileOperationsModule),
-        nameof(VitruvianStandardModules.ShellCommandModule),
-        nameof(VitruvianStandardModules.SummarizationModule),
-        nameof(VitruvianStandardModules.WebSearchModule),
-        nameof(VitruvianStandardModules.GmailModule)
-    };
+    var prefs = ModulePreferences.Load();
+    var standardInfos = ModuleSelector.GetStandardModuleInfos();
 
-    Console.WriteLine($"Standard modules:{Environment.NewLine}  - {string.Join($"{Environment.NewLine}  - ", standardModules)}");
+    Console.WriteLine("Standard modules:");
+    foreach (var info in standardInfos)
+    {
+        var status = info.IsCore || prefs.IsModuleEnabled(info.Domain) ? "enabled" : "disabled";
+        var coreTag = info.IsCore ? " (core)" : "";
+        Console.WriteLine($"  - {info.Domain} [{status}]{coreTag}");
+    }
+
+    // Show modules from the modules/ folder
+    var discoveredModules = ModuleSelector.DiscoverModulesFromFolder(modulesPath);
+    if (discoveredModules.Count > 0)
+    {
+        Console.WriteLine("Discovered modules (modules/ folder):");
+        foreach (var info in discoveredModules)
+        {
+            var status = prefs.IsModuleEnabled(info.Domain) ? "enabled" : "disabled";
+            Console.WriteLine($"  - {info.Domain} [{status}]  ({info.Source})");
+        }
+    }
 
     using var loaderServiceProvider = new ServiceCollection().BuildServiceProvider();
     var installedModules = InstalledModuleLoader.LoadModulesWithSources(pluginsPath, loaderServiceProvider);
     var installedDlls = ModuleInstaller.ListInstalledModules(pluginsPath);
     if (installedDlls.Count == 0)
     {
-        Console.WriteLine("No installed modules found.");
+        Console.WriteLine("No installed plugin modules found.");
     }
     else
     {
-        Console.WriteLine("Installed modules:");
+        Console.WriteLine("Installed plugin modules:");
         foreach (var (module, dllPath) in installedModules)
         {
             Console.WriteLine($"  - {module.Domain}  ({Path.GetFileName(dllPath)})");
@@ -94,6 +113,8 @@ void PrintInstalledModules()
 
         Console.WriteLine("Use '/unregister-module <domain or filename>' to remove.");
     }
+
+    Console.WriteLine("\nUse '/configure-modules' or '--configure-modules' to change module selection.");
 }
 
 Task<int> PrintAuditListAsync()
@@ -120,6 +141,8 @@ if (startupArgs.Length >= 1 &&
     Console.WriteLine("  --list-modules");
     Console.WriteLine("  --install-module <path|package@version> [--allow-unsigned]");
     Console.WriteLine("  --unregister-module <domain>");
+    Console.WriteLine("  --configure-modules");
+    Console.WriteLine("  --model <provider[:model]>  (e.g. --model openai or --model anthropic:claude-3-5-sonnet-latest)");
     Console.WriteLine("  --inspect-module <path|package@version> [--json] (alias: inspect-module)");
     Console.WriteLine("  --doctor [--json] (alias: doctor)");
     Console.WriteLine("  --policy validate <policyFile> (alias: policy validate)");
@@ -297,9 +320,60 @@ if (startupArgs.Length >= 1 &&
     (string.Equals(startupArgs[0], "--setup", StringComparison.OrdinalIgnoreCase) ||
      string.Equals(startupArgs[0], "/setup", StringComparison.OrdinalIgnoreCase)))
 {
-    Console.WriteLine(ModuleInstaller.TryRunInstallScript()
-        ? "Vitruvian setup complete."
-        : "Vitruvian setup script could not be started. Ensure scripts/install.sh or scripts/install.ps1 exists next to the app.");
+    var setupCompleted = ModuleInstaller.TryRunInstallScript();
+    if (setupCompleted)
+    {
+        EnvFileLoader.Load(startDirectory: AppContext.BaseDirectory, overwriteExisting: true);
+        Console.WriteLine($"Vitruvian setup complete. Current persona: {GetCurrentPersonaDisplay()}.");
+        if (ModelConfiguration.TryCreateFromEnvironment(out var setupModelConfig, out var setupError) && setupModelConfig is not null)
+            Console.WriteLine($"Model provider configured: {setupModelConfig.Provider} ({setupModelConfig.Model})");
+        else if (!string.IsNullOrWhiteSpace(setupError))
+            Console.WriteLine($"Model configuration warning: {setupError}");
+    }
+    else
+    {
+        Console.WriteLine("Vitruvian setup script could not be started. Ensure scripts/install.sh or scripts/install.ps1 exists next to the app.");
+    }
+    return;
+}
+
+if (startupArgs.Length >= 1 &&
+    (string.Equals(startupArgs[0], "--configure-modules", StringComparison.OrdinalIgnoreCase) ||
+     string.Equals(startupArgs[0], "/configure-modules", StringComparison.OrdinalIgnoreCase)))
+{
+    var standardModules = ModuleSelector.GetStandardModuleInfos();
+    var discoveredModules = ModuleSelector.DiscoverModulesFromFolder(modulesPath);
+    var allModules = standardModules.Concat(discoveredModules).ToList();
+    var prefs = ModulePreferences.Load();
+    prefs = ModuleSelector.RunInteractiveSelection(allModules, prefs);
+    prefs.Save();
+    Console.WriteLine("Module preferences saved.");
+    return;
+}
+
+if (startupArgs.Length >= 2 &&
+    (string.Equals(startupArgs[0], "--model", StringComparison.OrdinalIgnoreCase) ||
+     string.Equals(startupArgs[0], "/model", StringComparison.OrdinalIgnoreCase)))
+{
+    var modelArg = startupArgs[1];
+    var colonIndex = modelArg.IndexOf(':');
+    var provider = colonIndex >= 0 ? modelArg[..colonIndex] : modelArg;
+    var modelName = colonIndex >= 0 ? modelArg[(colonIndex + 1)..] : null;
+
+    if (!string.Equals(provider, "openai", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(provider, "anthropic", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(provider, "gemini", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine($"Unknown provider '{provider}'. Supported: openai, anthropic, gemini.");
+        return;
+    }
+
+    EnvFileLoader.PersistSecret("VITRUVIAN_MODEL_PROVIDER", provider.ToLowerInvariant());
+    if (!string.IsNullOrWhiteSpace(modelName))
+        EnvFileLoader.PersistSecret("VITRUVIAN_MODEL_NAME", modelName);
+    EnvFileLoader.Load(overwriteExisting: true);
+    Console.WriteLine($"Model provider set to '{provider}'" +
+        (string.IsNullOrWhiteSpace(modelName) ? " (using default model)." : $" with model '{modelName}'."));
     return;
 }
 
@@ -311,7 +385,7 @@ if (!ModelConfiguration.TryCreateFromEnvironment(out var modelConfiguration, out
     Console.WriteLine("No Vitruvian setup found. Running installer...");
     if (ModuleInstaller.TryRunInstallScript())
     {
-        EnvFileLoader.Load(overwriteExisting: true);
+        EnvFileLoader.Load(startDirectory: AppContext.BaseDirectory, overwriteExisting: true);
         ModelConfiguration.TryCreateFromEnvironment(out modelConfiguration, out modelConfigurationError);
     }
 }
@@ -356,21 +430,26 @@ if (modelClient is not null)
     builder.Services.AddSingleton<IModelClient>(modelClient);
 builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 
-// Register modules
-builder.Services.AddSingleton<IVitruvianModule>(sp =>
-    new FileOperationsModule(sp.GetService<IModelClient>(), workingDirectory));
+// Load module preferences to determine which standard modules to enable.
+var modulePreferences = ModulePreferences.Load();
+
+// Register modules — core modules are always registered, optional modules respect preferences.
 builder.Services.AddSingleton<IVitruvianModule>(sp =>
     new ConversationModule(sp.GetService<IModelClient>()));
-builder.Services.AddSingleton<IVitruvianModule>(sp =>
-    new WebSearchModule(sp.GetService<IModelClient>()));
-builder.Services.AddSingleton<IVitruvianModule>(sp =>
-    new SummarizationModule(sp.GetService<IModelClient>()));
-builder.Services.AddSingleton<IVitruvianModule>(sp =>
-    new GmailModule(sp.GetService<IModelClient>()));
-builder.Services.AddSingleton<IVitruvianModule>(sp =>
-    new ShellCommandModule(
-        sp.GetService<IModelClient>(),
-        workingDirectory,
+if (modulePreferences.IsModuleEnabled("file-operations"))
+    builder.Services.AddSingleton<IVitruvianModule>(sp =>
+        new FileOperationsModule(sp.GetService<IModelClient>(), workingDirectory));
+if (modulePreferences.IsModuleEnabled("web-search"))
+    builder.Services.AddSingleton<IVitruvianModule>(sp =>
+        new WebSearchModule(sp.GetService<IModelClient>()));
+if (modulePreferences.IsModuleEnabled("summarization"))
+    builder.Services.AddSingleton<IVitruvianModule>(sp =>
+        new SummarizationModule(sp.GetService<IModelClient>()));
+if (modulePreferences.IsModuleEnabled("shell-command"))
+    builder.Services.AddSingleton<IVitruvianModule>(sp =>
+        new ShellCommandModule(
+            sp.GetService<IModelClient>(),
+            workingDirectory,
         commandRunner: sp.GetRequiredService<ICommandRunner>()));
 
 // Register module router with configuration options
@@ -398,6 +477,16 @@ foreach (var (module, sourceDllPath) in InstalledModuleLoader.LoadModulesWithSou
 {
     requestProcessor.RegisterModule(module);
     pluginSources[module.Domain] = (sourceDllPath, DeleteOnUnregister: true);
+}
+
+// Load user-selectable modules from the modules/ folder, respecting preferences.
+if (Directory.Exists(modulesPath))
+{
+    foreach (var (module, sourceDllPath) in ModuleSelector.LoadEnabledModules(modulesPath, modulePreferences, host.Services))
+    {
+        requestProcessor.RegisterModule(module);
+        pluginSources[module.Domain] = (sourceDllPath, DeleteOnUnregister: false);
+    }
 }
 
 var discordToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
@@ -461,6 +550,7 @@ else
     PrintCommands();
     if (modelConfiguration is not null)
         Console.WriteLine($"Model provider configured: {modelConfiguration.Provider} ({modelConfiguration.Model})");
+    Console.WriteLine($"Current persona: {GetCurrentPersonaDisplay()}");
     Console.WriteLine($"Working directory: {workingDirectory}");
 
     var cliService = new CliHostedService(
@@ -582,7 +672,17 @@ else
         },
         ModuleInstaller.ScaffoldNewModule,
         taskStore,
-        scheduleParser);
+        scheduleParser,
+        configureModules: () =>
+        {
+            var standardModules = ModuleSelector.GetStandardModuleInfos();
+            var discoveredModules = ModuleSelector.DiscoverModulesFromFolder(modulesPath);
+            var allModules = standardModules.Concat(discoveredModules).ToList();
+            var prefs = ModulePreferences.Load();
+            prefs = ModuleSelector.RunInteractiveSelection(allModules, prefs);
+            prefs.Save();
+            Console.WriteLine("Module preferences saved. Restart Vitruvian CLI to apply changes.");
+        });
 
     // Register the CLI service as a hosted service and run the host.
     // The host manages the CLI lifecycle alongside any other background services (e.g. scheduler).

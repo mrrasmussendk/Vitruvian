@@ -119,7 +119,6 @@ public sealed class RequestProcessor
             ConversationModule _ => new ConversationModule(contextAwareClient),
             WebSearchModule _ => new WebSearchModule(contextAwareClient),
             SummarizationModule _ => new SummarizationModule(contextAwareClient),
-            GmailModule _ => new GmailModule(contextAwareClient),
             ShellCommandModule _ => new ShellCommandModule(
                 contextAwareClient,
                 GetDefaultWorkingDirectory(),

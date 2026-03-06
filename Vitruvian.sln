@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -24,6 +24,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vitruvian.Cli", "src\Vitruvian.Cli\Vitruvian.Cli.csproj", "{F195AD91-BC80-4A41-99C8-A174810C9632}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vitruvian.WeatherModule", "src\Vitruvian.WeatherModule\Vitruvian.WeatherModule.csproj", "{4EEE5008-C036-4E24-9CB5-D132A2F0E781}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "modules", "modules", "{1DAA5579-F050-4DAA-8C6D-1CF368177FFB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vitruvian.GmailModule", "modules\Vitruvian.GmailModule\Vitruvian.GmailModule.csproj", "{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -143,6 +147,18 @@ Global
 		{4EEE5008-C036-4E24-9CB5-D132A2F0E781}.Release|x64.Build.0 = Release|Any CPU
 		{4EEE5008-C036-4E24-9CB5-D132A2F0E781}.Release|x86.ActiveCfg = Release|Any CPU
 		{4EEE5008-C036-4E24-9CB5-D132A2F0E781}.Release|x86.Build.0 = Release|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Debug|x64.Build.0 = Debug|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Debug|x86.Build.0 = Debug|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Release|x64.ActiveCfg = Release|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Release|x64.Build.0 = Release|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Release|x86.ActiveCfg = Release|Any CPU
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -157,5 +173,6 @@ Global
 		{9CD94005-A7ED-4A91-AECD-44A3DD41B9E8} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{F195AD91-BC80-4A41-99C8-A174810C9632} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{4EEE5008-C036-4E24-9CB5-D132A2F0E781} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{A24A13BF-2FD2-4504-8C3C-1A53AFDE5E77} = {1DAA5579-F050-4DAA-8C6D-1CF368177FFB}
 	EndGlobalSection
 EndGlobal
