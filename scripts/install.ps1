@@ -67,7 +67,7 @@ function Get-CachedValue {
 function Set-ActiveProfile {
     param([string]$Name)
     @(
-        "`$env:VITRUVIAN_PROFILE='$Name'"
+        "VITRUVIAN_PROFILE=$Name"
     ) | Set-Content -Path $EnvFile -Encoding UTF8
 }
 
@@ -160,10 +160,10 @@ switch ($storageChoice) {
 }
 
 $lines = @(
-    "`$env:VITRUVIAN_MODEL_PROVIDER='$provider'"
-    "`$env:${keyName}='$apiKey'"
-    "`$env:VITRUVIAN_MODEL_NAME='$selectedModel'"
-    "`$env:VITRUVIAN_MEMORY_CONNECTION_STRING='$memoryConnection'"
+    "VITRUVIAN_MODEL_PROVIDER=$provider"
+    "${keyName}=$apiKey"
+    "VITRUVIAN_MODEL_NAME=$selectedModel"
+    "VITRUVIAN_MEMORY_CONNECTION_STRING=$memoryConnection"
 )
 
 if ($deployChoice -eq '2') {
@@ -172,8 +172,8 @@ if ($deployChoice -eq '2') {
     if ([string]::IsNullOrWhiteSpace($discordToken) -or [string]::IsNullOrWhiteSpace($discordChannel)) {
         throw 'DISCORD_BOT_TOKEN and DISCORD_CHANNEL_ID are required for Discord mode.'
     }
-    $lines += "`$env:DISCORD_BOT_TOKEN='$discordToken'"
-    $lines += "`$env:DISCORD_CHANNEL_ID='$discordChannel'"
+    $lines += "DISCORD_BOT_TOKEN=$discordToken"
+    $lines += "DISCORD_CHANNEL_ID=$discordChannel"
 }
 elseif ($deployChoice -eq '3') {
     $webSocketUrl = Read-Host 'Enter VITRUVIAN_WEBSOCKET_URL [ws://0.0.0.0:5005/Vitruvian/]'
@@ -182,9 +182,9 @@ elseif ($deployChoice -eq '3') {
     if ([string]::IsNullOrWhiteSpace($webSocketPublicUrl)) { $webSocketPublicUrl = $webSocketUrl }
     $webSocketDomain = Read-Host 'Enter VITRUVIAN_WEBSOCKET_DOMAIN [dev]'
     if ([string]::IsNullOrWhiteSpace($webSocketDomain)) { $webSocketDomain = 'dev' }
-    $lines += "`$env:VITRUVIAN_WEBSOCKET_URL='$webSocketUrl'"
-    $lines += "`$env:VITRUVIAN_WEBSOCKET_PUBLIC_URL='$webSocketPublicUrl'"
-    $lines += "`$env:VITRUVIAN_WEBSOCKET_DOMAIN='$webSocketDomain'"
+    $lines += "VITRUVIAN_WEBSOCKET_URL=$webSocketUrl"
+    $lines += "VITRUVIAN_WEBSOCKET_PUBLIC_URL=$webSocketPublicUrl"
+    $lines += "VITRUVIAN_WEBSOCKET_DOMAIN=$webSocketDomain"
 }
 
 $lines | Set-Content -Path $ProfileEnvFile -Encoding UTF8

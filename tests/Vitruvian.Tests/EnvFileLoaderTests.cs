@@ -56,6 +56,25 @@ public sealed class EnvFileLoaderTests : IDisposable
     }
 
     [Fact]
+    public void Load_LoadsStandardKeyValueFormat()
+    {
+        var providerKey = $"VITRUVIAN_MODEL_PROVIDER_{Guid.NewGuid():N}";
+        var modelKey = $"VITRUVIAN_MODEL_NAME_{Guid.NewGuid():N}";
+        Track("VITRUVIAN_PROFILE", providerKey, modelKey);
+
+        File.WriteAllText(Path.Combine(_tempDir, ".env.Vitruvian"), $"VITRUVIAN_PROFILE=dev");
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".env.Vitruvian.dev"),
+            $"{providerKey}=openai{Environment.NewLine}{modelKey}=gpt-4o-mini");
+
+        EnvFileLoader.Load(_tempDir, overwriteExisting: true);
+
+        Assert.Equal("dev", Environment.GetEnvironmentVariable("VITRUVIAN_PROFILE"));
+        Assert.Equal("openai", Environment.GetEnvironmentVariable(providerKey));
+        Assert.Equal("gpt-4o-mini", Environment.GetEnvironmentVariable(modelKey));
+    }
+
+    [Fact]
     public void PersistSecret_CreatesFileAtAppBaseDirectory_WhenNoFileExists()
     {
         // PersistSecret should default to AppContext.BaseDirectory for new files,

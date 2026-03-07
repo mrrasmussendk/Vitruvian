@@ -51,7 +51,7 @@ read_cached_value() {
 write_active_profile() {
   local profile_name="$1"
   {
-    echo "export VITRUVIAN_PROFILE=${profile_name}"
+    echo "VITRUVIAN_PROFILE=${profile_name}"
   } > "$ENV_FILE"
 }
 
@@ -163,10 +163,10 @@ case "$storage_choice" in
 esac
 
 {
-  echo "export VITRUVIAN_MODEL_PROVIDER=${provider}"
-  echo "export ${key_name}=${api_key}"
-  echo "export VITRUVIAN_MODEL_NAME=${selected_model}"
-  echo "export VITRUVIAN_MEMORY_CONNECTION_STRING='${memory_connection}'"
+  echo "VITRUVIAN_MODEL_PROVIDER=${provider}"
+  echo "${key_name}=${api_key}"
+  echo "VITRUVIAN_MODEL_NAME=${selected_model}"
+  echo "VITRUVIAN_MEMORY_CONNECTION_STRING=${memory_connection}"
 } > "$profile_env_file"
 
 if [[ "$deploy_choice" == "2" ]]; then
@@ -177,8 +177,8 @@ if [[ "$deploy_choice" == "2" ]]; then
     exit 1
   fi
   {
-    echo "export DISCORD_BOT_TOKEN=${discord_token}"
-    echo "export DISCORD_CHANNEL_ID=${discord_channel}"
+    echo "DISCORD_BOT_TOKEN=${discord_token}"
+    echo "DISCORD_CHANNEL_ID=${discord_channel}"
   } >> "$profile_env_file"
 elif [[ "$deploy_choice" == "3" ]]; then
   read -r -p "Enter VITRUVIAN_WEBSOCKET_URL [ws://0.0.0.0:5005/Vitruvian/]: " websocket_url
@@ -188,9 +188,9 @@ elif [[ "$deploy_choice" == "3" ]]; then
   read -r -p "Enter VITRUVIAN_WEBSOCKET_DOMAIN [dev]: " websocket_domain
   websocket_domain="${websocket_domain:-dev}"
   {
-    echo "export VITRUVIAN_WEBSOCKET_URL=${websocket_url}"
-    echo "export VITRUVIAN_WEBSOCKET_PUBLIC_URL=${websocket_public_url}"
-    echo "export VITRUVIAN_WEBSOCKET_DOMAIN=${websocket_domain}"
+    echo "VITRUVIAN_WEBSOCKET_URL=${websocket_url}"
+    echo "VITRUVIAN_WEBSOCKET_PUBLIC_URL=${websocket_public_url}"
+    echo "VITRUVIAN_WEBSOCKET_DOMAIN=${websocket_domain}"
   } >> "$profile_env_file"
 fi
 
